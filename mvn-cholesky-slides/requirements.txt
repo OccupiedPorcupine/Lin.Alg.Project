@@ -1,0 +1,6 @@
+# Versions tested together; see README for system dependencies (LaTeX, ffmpeg, cairo, pango).
+manim==0.21.0  # 0.22 removed config.write_to_movie, which manim-slides 5.7.0 still sets
+manim-slides[pyside6]==5.7.0
+numpy>=2.0
+pytest>=8.0
+ruff>=0.6
