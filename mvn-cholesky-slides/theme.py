@@ -123,6 +123,7 @@ HERO_SIDE_CENTER = (3.6, 1.1)  # x = mu + G z with G and mu, beside the hero pla
 # --- Section 3 layout (scenes/s3_sampler.py) ---------------------------------
 
 PANEL_SWEEP = 5.0  # the single large plot of the rho sweep (slide 3.4)
+SECTION_OVERLAY_OPACITY = 0.95  # dim over the 2.5 frame behind the section-3 card
 VERIFY_PLANE_HEIGHT = 5.2  # 3.1 shrinks the hero plane to this height to make room
 VERIFY_PLANE_CENTER = (-3.7, -0.15)
 DEMO_PANEL = 2.2  # side of each plot in the row of four on slide 3.2

@@ -41,6 +41,7 @@ from components import (
     make_worked_marker,
     sqrt_tex,
     through_data,
+    swap_caption,
 )
 
 IDENTITY = np.eye(2)
@@ -272,8 +273,7 @@ class S2Solution(DeckSlide):
         self.reveal()
         self.play(
             Write(rule),
-            FadeOut(mix_caption),
-            FadeIn(th.caption("Independent spreads add up.")),
+            swap_caption(mix_caption, th.caption("Independent spreads add up.")),
             run_time=cfg.T_MEDIUM,
         )
 
@@ -947,8 +947,9 @@ class S2Solution(DeckSlide):
         self.play(FadeIn(verify[:3]), run_time=cfg.T_MEDIUM)
         self.play(Create(verify[3]), run_time=cfg.T_SHORT)
         self.play(
-            FadeOut(scale_note),
-            FadeIn(th.caption("Cholesky is just LDLᵀ with the pivots square-rooted.")),
+            swap_caption(
+                scale_note, th.caption("Cholesky is just LDLᵀ with the pivots square-rooted.")
+            ),
             run_time=cfg.T_SHORT,
         )
         self.reveal()

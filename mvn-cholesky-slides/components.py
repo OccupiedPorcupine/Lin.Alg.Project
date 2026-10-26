@@ -313,6 +313,15 @@ def panel_dot_radius(size: float) -> float:
     return th.DOT_RADIUS * min(1.0, max(0.6, size / th.PANEL_LARGE))
 
 
+def swap_caption(old: Mobject, new: Mobject) -> Succession:
+    """Fade the old caption out, then the new one in, in the same total time.
+
+    Captions sit in the same spot, so fading both at once stacks two
+    sentences on top of each other for the whole fade.
+    """
+    return Succession(FadeOut(old), FadeIn(new))
+
+
 def fade_in_cloud(cloud: VGroup, run_time: float = cfg.T_MEDIUM) -> Animation:
     """Dots appear in a quick ripple rather than all at once."""
     return FadeIn(cloud, lag_ratio=0.002, run_time=run_time)

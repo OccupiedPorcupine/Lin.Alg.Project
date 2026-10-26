@@ -41,6 +41,7 @@ from components import (
     make_symbolic_matrix,
     panel_dot_radius,
     sqrt_tex,
+    swap_caption,
 )
 
 IDENTITY = np.eye(2)
@@ -676,14 +677,14 @@ class S1Problem(DeckSlide):
         contour_caption = th.caption(
             "Every point on one ellipse has the same distance, so the same density."
         )
-        self.play(Create(contours), FadeOut(ruler), FadeOut(caption), FadeIn(contour_caption))
+        self.play(Create(contours), FadeOut(ruler), swap_caption(caption, contour_caption))
         self.reveal()
 
         final = th.caption(
             "Only two things change: numbers become vectors and matrices,"
             " and distance now accounts for tilt."
         )
-        self.play(FadeOut(contour_caption), FadeIn(final), run_time=cfg.T_SHORT)
+        self.play(swap_caption(contour_caption, final), run_time=cfg.T_SHORT)
 
     @staticmethod
     def _colored_formula(parts: list[str], roles: list[str | None], size: float) -> MathTex:
@@ -842,7 +843,8 @@ class S1Problem(DeckSlide):
         top_left = VGroup(goal, equation).arrange(DOWN, buff=0.45, aligned_edge=LEFT)
         top_left.next_to(title, DOWN, buff=0.4).set_x(-6.2, direction=LEFT)
         goal_box.move_to(goal[3])
-        goal_note.next_to(goal_box, RIGHT, buff=0.15)
+        # After the closing bracket: right beside the box it ran into the ")".
+        goal_note.next_to(goal, RIGHT, buff=0.25)
 
         readout, variance_value = self._variance_readout(scale)
         readout.next_to(title, DOWN, buff=0.45).to_edge(RIGHT, buff=th.EDGE_BUFF + 0.4)
@@ -870,7 +872,7 @@ class S1Problem(DeckSlide):
         why = th.math(r"\mathrm{Var}(a z) = a^2\, \mathrm{Var}(z)")
         why.next_to(top_left, DOWN, buff=0.35, aligned_edge=LEFT)
         why_caption = th.caption("Stretching by a multiplies the variance by a².")
-        self.play(Write(why), FadeOut(caption), FadeIn(why_caption), run_time=cfg.T_MEDIUM)
+        self.play(Write(why), swap_caption(caption, why_caption), run_time=cfg.T_MEDIUM)
         self.reveal()
 
         # The fix: scale by the square root of the variance.
@@ -880,8 +882,7 @@ class S1Problem(DeckSlide):
         self.play(
             Transform(equation, fixed),
             FadeOut(cross),
-            FadeOut(why_caption),
-            FadeIn(fix_caption),
+            swap_caption(why_caption, fix_caption),
             run_time=cfg.T_SHORT,
         )
         self.play(scale.animate.set_value(sd), run_time=cfg.T_LONG)
@@ -895,8 +896,7 @@ class S1Problem(DeckSlide):
         self.play(
             Transform(equation, shifted),
             check.animate.next_to(shifted, RIGHT, buff=0.35),
-            FadeOut(fix_caption),
-            FadeIn(shift_caption),
+            swap_caption(fix_caption, shift_caption),
             run_time=cfg.T_SHORT,
         )
         self.play(shift.animate.set_value(mu), warmth.animate.set_value(1.0), run_time=cfg.T_LONG)
@@ -1042,7 +1042,7 @@ class S1Problem(DeckSlide):
             row[1:].shift((rows[0][2].get_x() - row[2].get_x()) * RIGHT)
 
         one_caption = th.caption("Just like 1D: multiplying by the variance squares it.")
-        self.play(FadeOut(bridge), FadeOut(caption), FadeIn(one_caption), run_time=cfg.T_SHORT)
+        self.play(FadeOut(bridge), swap_caption(caption, one_caption), run_time=cfg.T_SHORT)
         self.play(FadeIn(target), run_time=cfg.T_SHORT)
         self._play_attempt(attempt_one)
         self.reveal()

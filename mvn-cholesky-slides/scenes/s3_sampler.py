@@ -37,6 +37,7 @@ from components import (
     panel_dot_radius,
     pivot_color,
     through_data,
+    swap_caption,
 )
 
 
@@ -115,7 +116,9 @@ class S3Sampler(DeckSlide):
         # switch between the two section videos is invisible.
         self.hero = HeroFrame(self.z_display, self.main_chol)
         self.add(self.hero)
-        self.overlay = make_dim_overlay()
+        # Darker than the default dim: the NumPy code behind the card is text,
+        # and at the default it competes with the section title.
+        self.overlay = make_dim_overlay(th.SECTION_OVERLAY_OPACITY)
         self.play(FadeIn(self.overlay), run_time=cfg.T_SHORT)
         self.show_section_slide("Brief part (b): change Σ, watch the data")
         self.section_card = VGroup(*self.mobjects[-3:])
@@ -295,8 +298,7 @@ class S3Sampler(DeckSlide):
                 FadeIn(g_block, shift=0.2 * DOWN),
                 ApplyPointwiseFunction(through_data(axes, lambda data, g=chol: g @ data), grid),
                 Transform(cloud, moved),
-                FadeOut(caption),
-                FadeIn(new_caption),
+                swap_caption(caption, new_caption),
                 run_time=cfg.T_MEDIUM,
             )
             caption = new_caption
@@ -304,7 +306,7 @@ class S3Sampler(DeckSlide):
         takeaway = th.caption(
             "<b>G's diagonal sets the spread. G's off-diagonal sets the tilt.</b>", th.COLOR_G
         )
-        self.play(FadeOut(caption), FadeIn(takeaway), run_time=cfg.T_SHORT)
+        self.play(swap_caption(caption, takeaway), run_time=cfg.T_SHORT)
 
     def _demo_panel(self, name: str, sigma: list[list[float]], half_width: float) -> VGroup:
         """Label, axes, faint z grid, blue z cloud, Sigma and G (G applied when revealed)."""
@@ -387,8 +389,7 @@ class S3Sampler(DeckSlide):
         self.play(
             GrowFromPoint(arrows, axes.c2p(0, 0)),
             FadeIn(rows),
-            FadeOut(self.eigen_caption),
-            FadeIn(caption),
+            swap_caption(self.eigen_caption, caption),
             run_time=cfg.T_MEDIUM,
         )
 
@@ -418,8 +419,7 @@ class S3Sampler(DeckSlide):
                 blend.animate.set_value(1.0),
                 Transform(sigma_block, new_block),
                 Transform(rows, new_rows),
-                FadeOut(caption),
-                FadeIn(new_caption),
+                swap_caption(caption, new_caption),
                 run_time=cfg.T_LONG,
             )
             # Not a frozen frame: rerun the updaters so everything shows the exact final Sigma.
@@ -475,8 +475,7 @@ class S3Sampler(DeckSlide):
                 previous.animate.set_opacity(0.3),
                 GrowArrow(before),
                 FadeIn(readout),
-                FadeOut(caption),
-                FadeIn(new_caption),
+                swap_caption(caption, new_caption),
                 run_time=cfg.T_SHORT,
             )
             self.play(TransformFromCopy(before, after), run_time=cfg.T_MEDIUM)
@@ -494,8 +493,7 @@ class S3Sampler(DeckSlide):
         self.play(
             Write(key),
             Create(key_box),
-            FadeOut(caption),
-            FadeIn(key_caption),
+            swap_caption(caption, key_caption),
             run_time=cfg.T_MEDIUM,
         )
         drawn.add(key, key_box)
@@ -651,7 +649,12 @@ class S3Sampler(DeckSlide):
         # Against the left margin: centered on the plot it would cover the pipeline.
         summary_box = boxed(summary, buff=0.2).match_y(axes)
         summary_box.set_x(-th.FRAME_WIDTH / 2 + th.EDGE_BUFF, direction=LEFT)
-        self.play(FadeOut(caption), FadeIn(summary_box, scale=1.05), run_time=cfg.T_MEDIUM)
+        # Past rho = 1 the cloud is gone, so the empty axes would only show
+        # through the box as a line striking out the middle row.
+        empty_axes = [FadeOut(axes)] if cfg.ENABLE_NEGATIVE_PIVOT_REVEAL else []
+        self.play(
+            FadeOut(caption), *empty_axes, FadeIn(summary_box, scale=1.05), run_time=cfg.T_MEDIUM
+        )
         # Freeze the live pieces: an always_redraw mobject rebuilds itself every
         # frame and would ignore the fade-out at the start of the next slide.
         for live in (cloud, gauge, *pipeline.live_entries):
