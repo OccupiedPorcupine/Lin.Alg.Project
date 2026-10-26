@@ -393,7 +393,7 @@ class S2Solution(DeckSlide):
             th.COLOR_BAD,
         )
         leak.next_to(blocks, DOWN, buff=0.25).align_to(title, LEFT)
-        for label, (a_block, lines, result, cross) in blocks:
+        for (label, cross), (a_block, lines, result) in blocks:
             self.play(FadeIn(label), FadeIn(a_block), run_time=cfg.T_SHORT)
             self.play(LaggedStart(*[Write(line) for line in lines], lag_ratio=0.5))
             self.play(FadeIn(result), Create(cross), run_time=cfg.T_SHORT)
@@ -404,8 +404,8 @@ class S2Solution(DeckSlide):
         )
 
     def _attempt_block(self, label: str, a_tex: list[list[str]], cov: np.ndarray) -> VGroup:
-        """One failed guess: a label over a row with its A, the three entries of
-        A A^T worked out, the resulting matrix and a cross."""
+        """One failed guess: a label with a cross, over a row with its A, the
+        three entries of A A^T worked out, and the resulting matrix."""
         size = th.CAPTION_SIZE
         a, b, c, d = (entry for row in a_tex for entry in row)
 
@@ -438,15 +438,12 @@ class S2Solution(DeckSlide):
             [fmt(cov[0, 0]), off],
             [off, fmt(cov[1, 1])],
         ]
-        result = VGroup(
-            th.math(r"\Rightarrow", size, th.COLOR_MUTED),
-            make_symbolic_matrix(result_entries, th.COLOR_TEXT, size),
-        ).arrange(RIGHT, buff=0.2)
-        cross = make_cross_mark(0.35)
-        row = VGroup(a_block, lines, result, cross).arrange(RIGHT, buff=0.3)
-        return VGroup(th.text(label, size, th.COLOR_MUTED), row).arrange(
-            DOWN, buff=0.15, aligned_edge=LEFT
-        )
+        result = make_symbolic_matrix(result_entries, th.COLOR_TEXT, size)
+        row = VGroup(a_block, lines, result).arrange(RIGHT, buff=0.4)
+        # The cross sits by the label: the row already fills the frame width.
+        header = VGroup(th.text(label, size, th.COLOR_MUTED), make_cross_mark(0.3))
+        header.arrange(RIGHT, buff=0.3)
+        return VGroup(header, row).arrange(DOWN, buff=0.15, aligned_edge=LEFT)
 
     def _play_real_question(self, title: Mobject) -> None:
         """We need A A^T = Sigma: three equations in a, b, c, d."""
@@ -659,25 +656,26 @@ class S2Solution(DeckSlide):
         chol = self.main_chol
         self.play(FadeOut(self.facts), run_time=cfg.T_SHORT)
         question = th.text("Why not just A·A = Σ?", th.BODY_SIZE, th.COLOR_MUTED)
+        size = th.CAPTION_SIZE
         rows = VGroup(
             VGroup(
-                colored_math("G", "G", "="),
-                make_matrix(chol @ chol, th.COLOR_TEXT),
-                colored_math(r"\ne", r"\Sigma"),
+                colored_math("G", "G", "=", size=size),
+                make_matrix(chol @ chol, th.COLOR_TEXT, size),
+                colored_math(r"\ne", r"\Sigma", size=size),
                 make_cross_mark(0.35),
             ),
             VGroup(
-                colored_math("G", "G^T", "="),
-                make_matrix(mm.covariance_of_linear_map(chol), th.COLOR_SIGMA),
-                colored_math("=", r"\Sigma"),
+                colored_math("G", "G^T", "=", size=size),
+                make_matrix(mm.covariance_of_linear_map(chol), th.COLOR_SIGMA, size),
+                colored_math("=", r"\Sigma", size=size),
                 make_check_mark(0.4),
             ),
         )
         for row in rows:
             row.arrange(RIGHT, buff=0.25)
         rows.arrange(RIGHT, buff=1.0)
-        aside = VGroup(question, rows).arrange(DOWN, buff=0.4, aligned_edge=LEFT)
-        aside.next_to(self.triangle_key, DOWN, buff=0.5).align_to(title, LEFT)
+        aside = VGroup(question, rows).arrange(DOWN, buff=0.3, aligned_edge=LEFT)
+        aside.next_to(self.triangle_key, DOWN, buff=0.45).align_to(title, LEFT)
         self.play(FadeIn(question), run_time=cfg.T_SHORT)
         for row in rows:
             self.play(FadeIn(row[:3]), run_time=cfg.T_MEDIUM)
@@ -865,12 +863,13 @@ class S2Solution(DeckSlide):
         flipped = lower.copy()
         size = len(route.pivots)
         moves = [
-            entry.animate(path_arc=-PI / 2).move_to(entry_at(v_mat, j, i))
+            entry.animate(path_arc=-PI / 3).move_to(entry_at(v_mat, j, i))
             for entry, (i, j) in zip(flipped.get_entries(), np.ndindex(size, size), strict=True)
         ]
         self.play(
             *moves,
-            Transform(flipped.get_brackets(), v_mat.get_brackets().copy()),
+            # L and V have the same shape, so the brackets just slide across.
+            flipped.get_brackets().animate.shift(v_mat.get_center() - lower.get_center()),
             run_time=cfg.T_LONG,
         )
         match = SurroundingRectangle(v_mat, color=th.COLOR_GOOD, buff=0.15)

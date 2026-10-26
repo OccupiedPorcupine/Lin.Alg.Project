@@ -103,14 +103,14 @@ GAUGE_MIN = -0.5  # lowest pivot the gauge can show (1.2^2 = 1.44 gives -0.44)
 # --- Section 1 layout (scenes/s1_problem.py) ---------------------------------
 
 HIST_WIDTH = 10.0  # portfolio return histograms (1.1)
-HIST_HEIGHT = 3.2
+HIST_HEIGHT = 2.9
 HEATMAP_CELL = 0.8  # side of one cell of the correlation heatmaps (1.1)
 PANEL_CODE_CLOUD = 4.0  # the N(0, I) cloud beside the code (1.2)
 PANEL_THUMB = 1.9  # the shrunken blue cloud in the corner (1.3)
-PANEL_FORMULA = 4.4  # the zoomed cloud with points A and B (1.4)
+PANEL_FORMULA = 4.0  # the zoomed cloud with points A and B (1.4)
 FORMULA_BELL_WIDTH = 3.4  # the small bell curve beside the 1D formula (1.4)
 FORMULA_BELL_HEIGHT = 1.4
-PANEL_ROW = 1.8  # side of each plot in the two attempt rows (1.7)
+PANEL_ROW = 2.1  # side of each plot in the two attempt rows (1.7)
 
 # --- Section 2 layout (scenes/s2_solution.py) --------------------------------
 

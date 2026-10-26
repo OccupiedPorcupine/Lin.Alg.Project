@@ -222,7 +222,9 @@ class S4WrapUp(DeckSlide):
                 "Gaussian only.",
                 [
                     th.text(
-                        "Real returns have fat tails: the 1.1 risk", th.CAPTION_SIZE, th.COLOR_MUTED
+                        "Real returns have fat tails: the portfolio risk",
+                        th.CAPTION_SIZE,
+                        th.COLOR_MUTED,
                     ),
                     th.text("can still be understated.", th.CAPTION_SIZE, th.COLOR_MUTED),
                     self._fixes_line(),
@@ -298,7 +300,7 @@ class S4WrapUp(DeckSlide):
         return th.math(
             rf"\rho = {fmt(cfg.RHO_ZERO_PIVOT)}:\ \lambda = {shown},"
             rf"\ \sqrt{{{fmt(values[-1])}}} = {fmt(np.sqrt(max(values[-1], 0.0)))}"
-            r"\text{ is fine (from 3.3)}",
+            r"\text{ is fine (eigen view)}",
             th.CAPTION_SIZE,
             th.COLOR_MUTED,
         )
@@ -324,7 +326,7 @@ class S4WrapUp(DeckSlide):
         bars = make_histogram(returns, axes, cfg.PORTFOLIO_HIST_BINS, th.COLOR_X)
         var = mm.value_at_risk(returns, cfg.VAR_LEVEL)
         var_line = DashedLine(axes.c2p(var, 0), axes.c2p(var, 1.1 * peak), color=th.COLOR_BAD)
-        tag = th.text("from 1.1", th.MIN_SIZE, th.COLOR_MUTED).next_to(axes, DOWN, buff=0.1)
+        tag = th.text("from the start", th.MIN_SIZE, th.COLOR_MUTED).next_to(axes, DOWN, buff=0.1)
         return VGroup(axes, bars, var_line, tag)
 
     # --- 4.4 -----------------------------------------------------------------
@@ -369,7 +371,7 @@ class S4WrapUp(DeckSlide):
                 r" = (\mathbf{x}-\boldsymbol{\mu})^T \Sigma^{-1} (\mathbf{x}-\boldsymbol{\mu})"
             ),
             th.text(
-                "Together: exactly the density from slide 1.4.", th.CAPTION_SIZE, th.COLOR_MUTED
+                "Together: exactly the density we started with.", th.CAPTION_SIZE, th.COLOR_MUTED
             ),
         ).arrange(DOWN, buff=0.32, aligned_edge=LEFT)
         lines.next_to(title, DOWN, buff=0.35).set_x(-6.2, direction=LEFT)

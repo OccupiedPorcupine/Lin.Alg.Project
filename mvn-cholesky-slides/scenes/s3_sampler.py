@@ -235,7 +235,7 @@ class S3Sampler(DeckSlide):
         chol = mm.cholesky_factor(cfg.EXAMPLE_3X3_SIGMA)
         z = mm.standard_normal_samples(cfg.N_STATS, dim, cfg.RANDOM_SEED)
         measured = mm.sample_cov(mm.transform(z, np.zeros(dim), chol))
-        heading = th.text("The 3×3 example from 2.4:", size, th.COLOR_MUTED)
+        heading = th.text("The 3×3 example we factored by hand:", size, th.COLOR_MUTED)
         g_block = make_labeled_matrix("G", chol, th.COLOR_G, size)
         target = make_labeled_matrix(r"\Sigma", cfg.EXAMPLE_3X3_SIGMA, th.COLOR_SIGMA, size)
         sigma_hat = make_labeled_matrix(r"\hat{\Sigma}", measured, th.COLOR_X, size, fixed=True)
@@ -644,14 +644,13 @@ class S3Sampler(DeckSlide):
         # Three lines in a box over the plot, which is empty by now: as one
         # caption line the summary would have to shrink below the minimum size.
         summary = VGroup(
-            th.text("Positive pivots: Cholesky works.", th.CAPTION_SIZE, th.COLOR_GOOD),
-            th.text("Zero pivot: the data collapses.", th.CAPTION_SIZE, th.COLOR_WARN),
-            th.text("Negative pivot: the Σ is impossible.", th.CAPTION_SIZE, th.COLOR_BAD),
+            th.text("Positive pivots: Cholesky works.", th.MIN_SIZE, th.COLOR_GOOD),
+            th.text("Zero pivot: the data collapses.", th.MIN_SIZE, th.COLOR_WARN),
+            th.text("Negative pivot: the Σ is impossible.", th.MIN_SIZE, th.COLOR_BAD),
         ).arrange(DOWN, buff=0.3, aligned_edge=LEFT)
-        summary_box = boxed(summary).move_to(axes)
-        # Keep the box on screen even though the plot sits close to the left edge.
-        left_limit = -th.FRAME_WIDTH / 2 + th.EDGE_BUFF
-        summary_box.shift(max(0.0, left_limit - summary_box.get_left()[0]) * RIGHT)
+        # Against the left margin: centered on the plot it would cover the pipeline.
+        summary_box = boxed(summary, buff=0.2).match_y(axes)
+        summary_box.set_x(-th.FRAME_WIDTH / 2 + th.EDGE_BUFF, direction=LEFT)
         self.play(FadeOut(caption), FadeIn(summary_box, scale=1.05), run_time=cfg.T_MEDIUM)
         # Freeze the live pieces: an always_redraw mobject rebuilds itself every
         # frame and would ignore the fade-out at the start of the next slide.

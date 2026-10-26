@@ -10,120 +10,128 @@ Hi everyone. Our project is about simulating random vectors that follow a multiv
 
 ### 1.0  Section slide: Problem
 
-Let's start with the problem. We will look at what a computer can give us, what we actually want, and why the obvious fixes fail.
+Let's start with the problem. We will see where correlated randomness matters, what a computer can give us, what we actually want, and why the obvious fixes fail.
 
-### 1.1  Real variables move together
+### 1.1  Hook
 
-Here are simulated daily returns for two stocks. On the left they are independent, so the cloud is round. On the right they tend to move together, which tilts the cloud. If we want to simulate a portfolio honestly, we need draws like the ones on the right.
+Before any math, here are three places where correlated randomness matters. A bank simulating a portfolio underestimates its risk if it treats the stocks as independent. A random smooth curve is really one draw from a 60 dimensional normal, and synthetic data is only useful if it keeps the real correlations. All three need random numbers that move together.
 
 ### 1.2  What computers give us
 
-This is what a computer gives us for free. One line of NumPy draws from the 1D standard normal, the familiar bell curve with mean 0 and variance 1. Each row here is two independent draws, so the vector z is N of 0 and I, and that independence is why the cloud is round.
+Here's what a computer gives us for free. One line of numpy and we get 800 rows, and each row is a point. Every draw is independent, and the two columns have nothing to do with each other, so the correlation is zero and the cloud is round. The rest of this talk is about mixing those two columns together.
 
 ### 1.3  What we want
 
-What we actually want is a multivariate normal with a mean vector mu and a covariance matrix Sigma. The diagonal of Sigma holds the variances of each variable, and the off-diagonal entries hold how much they move together. Data drawn from it looks like this tilted orange cloud. How we made it is the rest of the talk.
+What we actually want is a multivariate normal with a mean vector mu and a covariance matrix Sigma. Mu is the center of the cloud. The diagonal of Sigma holds the variances, how spread out each variable is, and the off-diagonal entry is the covariance, how the two move together. How we made this cloud is the rest of the talk.
 
-### 1.4  What each entry does
+### 1.4  Reading the formula: same idea as 1D
 
-Here is what each entry actually does, using the same random points the whole time. Making sigma xx bigger stretches the cloud along x, and making sigma yy smaller squeezes it in y. The covariance sets the tilt: negative tilts it down, and zero lines the ellipse up with the axes.
+This formula looks scary, but you already know it. Here's the 1D bell curve, and if I rearrange it a little, it has exactly the same shape as the multivariate one. Numbers become vectors, σ² becomes Σ, and dividing becomes multiplying by an inverse. The only genuinely new idea is the distance term: it measures distance in units of spread, so a point along the long axis counts as closer than one the same ruler distance along the short axis.
 
 ### 1.5  The question
 
-So here is the whole problem in one picture. On the left is the round cloud we can generate, and on the right is the tilted cloud we want. Both plots use the same scale. So the question is: how do we change the distribution of the points to get from the left to the right?
+So here is the whole problem in one picture. On the left is the round cloud a computer gives us, and on the right is the tilted cloud we want, drawn to the same scale. The question for the rest of the talk is how to turn one into the other.
 
 ### 1.6  Warm-up: we already do this in 1D
 
-Let's warm up in one dimension, where we already know the answer. Take z from N of 0 and 1, stretch it by the standard deviation, then shift it by the mean; watch the mean line and the sigma markers move. The result is exactly N of 3 and 4.
+Let's start with something we already know. We want a normal with mean 3 and variance 4. The obvious move is to multiply by 4, but the curve overshoots and the variance jumps to 16, because stretching by a multiplies the variance by a squared. So we stretch by the square root of 4, which is 2, then shift by 3. To get variance sigma squared, you scale by its square root.
 
-### 1.7  The trap: scaling by the variance
+### 1.7  The nD catch: the variance becomes a matrix
 
-Here is the trap. If we scale by the variance, 4, instead of the standard deviation, 2, the spread doubles and the variance becomes 16, four times too big. So the rule is: scale by the square root of the variance. Remember this, because in more dimensions we will need the square root of a matrix.
-
-### 1.8  What is the square root of a matrix?
-
-In more than one dimension, what is the square root of a matrix? Let's just try things and measure. Taking the square root of each entry gives a cloud that is too thin and the wrong covariance. Multiplying by Sigma itself overshoots badly, so we need a better idea.
+Now go up a dimension. The variance is no longer one number, it's a whole matrix. If we make the same mistake as before and multiply by Σ, we get Σ squared. And taking the square root of each entry fails too. So what does the square root of a matrix even mean?
 
 ## S2Solution
 
 ### 2.0  Section slide: Solution
 
-Now the solution. We will find the right idea of a square root for a matrix, compute it with Cholesky, and turn it into a four line algorithm.
+Now the solution. We will work out what a matrix does to the spread of the data, use that to define the square root of a matrix, compute it by hand, and turn it into a four line algorithm.
 
-### 2.1  What a matrix does to covariance
+### 2.1  What a matrix does to the spread
 
-Here is the one fact that explains everything. Remember z is the vector of independent standard normals the computer gives us, so its covariance is the identity. If x equals A times z, its covariance is A times I times A transpose, which is just A A transpose, and that explains the strange numbers from the square root attempts.
+Let's name our characters. z is the random point we start with, A is the matrix we multiply by, and x is the point we get out. Each new variable is a mix of z₁ and z₂, independent spreads add, and covariance only comes from shared ingredients. Put those in a matrix and it's exactly A times A transpose, the nD version of 'scaling by a multiplies variance by a²'. So the real question is: what A gives A Aᵀ = Σ?
 
-### 2.2  Defining a "square root" of Σ
+### 2.2  Many square roots
 
-So the right notion of a square root is any matrix A with A A transpose equal to Sigma, just like sigma times sigma is sigma squared in 1D. But it is not unique. Rotating the round cloud first changes nothing, so A times any rotation Q works too.
+So a square root of Σ means any matrix A with A A transpose equal to Σ, just like σ times σ is σ² in one dimension. But it is not unique. If we rotate the round cloud first, it still looks exactly the same, so A times any rotation Q works too. We need a rule to pick one.
 
-### 2.3  Cholesky decomposition
+### 2.3  The rule: force a triangle
 
-The rule we pick is the Cholesky decomposition: write Sigma as L L transpose, where L is lower triangular with a positive diagonal. It is unique, it exists exactly when Sigma is symmetric positive definite, and it is fast and stable, which is why every library uses it.
+Here is the rule. Force the top-right entry of A to zero, and the three equations untangle: the first gives a, then the third gives c, then the second gives d. That triangular A is the Cholesky factor, and from now on we call it G. It is unique, it exists exactly when Σ is positive definite, and it is fast. And note the test is G times G transpose, not G times G.
 
-### 2.4  Computing it
+### 2.4a  By hand, step 1: LU (ordinary elimination)
 
-Let's compute L for our example by hand. The first entry is the square root of 4, the entry below it is 2 divided by 2, and the last entry is whatever variance is left after removing that. Multiplying back gives Sigma, and the general formulas are the same pattern applied one column at a time.
+We already know how to factor a matrix: Gaussian elimination. Each step subtracts a multiple of one row from another. We record those multipliers in L, and what's left is U.
 
-### 2.5  Intuition: L is a mixing recipe
+### 2.4b  Step 2: LDV (pull the pivots out)
 
-Here is the intuition for what L does. With unit variances, x1 is just z1, and x2 takes a slice of z1 plus some fresh noise z2. The slice of z1 is exactly the part x2 shares with x1, and that sharing is what we call correlation.
+U's diagonal holds the pivots. If we pull them out into a diagonal matrix D, we get L D V.
 
-### 2.6  The algorithm
+### 2.4c  Step 3: LDLᵀ (symmetry gives V for free)
 
-Putting it together, the algorithm is four lines: choose mu and Sigma, factor Sigma, draw independent normals, and compute mu plus L z. Watch the grid: L shears the whole plane, the circle becomes an ellipse, and then everything shifts by mu. Our tracked point lands exactly where the hand calculation says, and in NumPy it is three lines.
+Because Σ is symmetric, V turns out to be exactly L transposed. So Σ = L D Lᵀ.
 
-## S3Demo
+### 2.4d  Step 4: split D in half, giving G Gᵀ
 
-### 3.0  Section slide: Demo
+Now the trick: split D into two square roots and give one to each side. L √D is our G, and Σ = G Gᵀ. That's Cholesky. It needs every pivot to be strictly positive, which is exactly the positive definite condition.
 
-Time for the demo, which is part b of the brief. First we check that the sampler works, then we change Sigma and watch how the shape and spread of the data respond.
+### 2.4e  The shortcut: solve for G directly
 
-### 3.1  Does the sampler work?
+In practice, you skip the detour and solve for G directly, column by column. Same numbers, and the general formula is just that pattern written down.
 
-Before playing with it, let's check that it works. We drew 20,000 samples and measured their mean and covariance; the dots you see are the first 800 of them. The measured values match the targets to about two decimal places, and the cloud sits inside the 1 and 2 sigma contours of the true density.
+### 2.5  The algorithm
 
-### 3.2  Covariance structures side by side
+Back to our 2 by 2, where G is 2, 0, 1, 2. The whole algorithm is four lines: choose μ and Σ, factor Σ, draw independent normals, and compute μ plus G z. Watch the grid: G shears the whole plane, the circle becomes an ellipse, and then everything shifts by μ. Our tracked point lands exactly at 2, 0.5, and in NumPy it is three lines.
 
-Now part b of the brief: different covariance structures. Every panel uses exactly the same z samples, so the only thing changing is Sigma. Equal variances give a circle, unequal variances stretch it along an axis, and a positive or negative correlation tilts it up or down.
+## S3Sampler
 
-### 3.3  Correlation sweep
+### 3.0  Section slide: Putting the sampler to work
 
-Here we sweep the correlation live. The samples z never change; only rho does, through the mixing recipe from earlier. As rho approaches 1 the fresh-noise term shrinks and the cloud collapses onto a line. At exactly 1 there is no fresh noise left, Sigma is singular, and Cholesky fails.
+The sampler is built, so let's put it to work. This section is part b of the brief: we check that it really produces Sigma, then turn the dial on Sigma and watch the data respond.
 
-### 3.4  The eigen view
+### 3.1  Does it work?
 
-One more way to read Sigma. Its eigenvectors point along the axes of the ellipse, and the eigenvalues say how much variance lies along each one. The arrows here are two standard deviations long, so they reach exactly to the 2 sigma contour.
+We built a sampler, but does it really produce the Sigma we asked for? Measured from 20,000 samples, the mean and covariance match the targets to about two decimal places, and the dots fill the 1 and 2 sigma contours just as the density predicts. The 3 by 3 G we computed by hand in 2.4 passes the same test.
+
+### 3.2  Turning the dial
+
+Now we trust the machine, so let's feed it different Sigmas. Every panel starts from exactly the same z, so the only thing changing is G. The identity does nothing, a diagonal G stretches each axis by a square root, and an off-diagonal entry shears the grid and tilts the cloud one way or the other.
+
+### 3.3  The eigen view
+
+Cholesky told us how to build this cloud. Eigenvectors tell us how to read it. Most arrows turn when I multiply them by Sigma, but two directions only stretch: the diagonal by 9 and the other diagonal by 1. Their square roots, 3 and 1, are exactly how spread out the cloud is along each axis.
+
+### 3.4  Turning the dial until it breaks
+
+Let's run the same machine from 2.4 while turning rho up. Elimination leaves a second pivot of 1 minus rho squared, and its square root is the only entry in G that gives the cloud any thickness. At exactly rho equals 1 the pivot hits zero, x2 is just a copy of x1, and NumPy refuses to factor it. Push past 1 and the pivot goes negative: there's no square root at all, because no real data could have that covariance.
 
 ## S3bThreeD
 
 ### 3.5  Bonus: the same recipe in 3D
 
-The same recipe works in any dimension. Here is a three dimensional Sigma, factored with Cholesky and applied to 3D standard normals. As the camera moves, you can see the cloud is a tilted ellipsoid.
+The same recipe works in any dimension. Here is the 3 by 3 Sigma from our hand calculation, factored with Cholesky and applied to 3D standard normals. As the camera moves, you can see the cloud is a tilted ellipsoid.
 
 ## S4WrapUp
 
 ### 4.0  Section slide: Wrap-up
 
-To finish, a quick recap, where this is used, its limits, and one bonus connection back to the density formula from the start.
+To finish, a quick recap, a second look at the smooth curves from the start, and the limits of the method.
 
 ### 4.1  Recap
 
-To recap: we start from independent noise that any computer can produce, factor our chosen Sigma into L times L transpose, and apply x equals mu plus L z. The result has exactly the correlation structure we asked for.
+To recap: we start from independent noise that any computer can produce, factor our chosen Sigma into G times G transpose, and apply x equals mu plus G z. The result has exactly the correlation structure we asked for.
 
-### 4.2  Where this is used
+### 4.2  The smooth curves, explained
 
-This is not just a classroom trick. Banks use it to simulate correlated asset returns for risk, Gaussian processes use it to draw random functions, and it is a standard way to generate realistic synthetic data with a known correlation structure.
+Remember the smooth random curves from the very start? Now we can say exactly what happened. Each jagged row of 60 independent values is z, and multiplying by G, the Cholesky factor of the kernel, mixes neighbouring points together so the curve comes out smooth. It is the same x equals G z, just in 60 dimensions instead of 2.
 
 ### 4.3  Limits
 
-There are limits. Cholesky needs Sigma to be strictly positive definite, as we saw with rho equal to 1. The output is always Gaussian, so it cannot produce skewed or fat-tailed data. When Sigma is close to singular, eigendecomposition or SVD are safer, and that is what NumPy's multivariate normal uses by default.
+Three limits. First, Cholesky needs every pivot strictly positive; at rho equal to 1 the pivot hit zero and it stopped. Second, the eigen square root from the eigen view still works there, because the square root of a zero eigenvalue is just zero, which is why NumPy's multivariate normal uses SVD by default, even though it is slower. Third, this only makes Gaussian data, and real returns have fat tails, but the usual fixes, like multivariate t and Gaussian copulas, still get their correlation from the same x equals mu plus G z.
 
-### 4.4  Bonus: the derivation is the same transformation
-
-A bonus for the curious. If we run x equals mu plus L z backwards with the change of variables formula, the determinant of L gives the square root of the determinant of Sigma, and the squared length of z becomes the quadratic form. That is exactly the density from the start, and at our worked point both sides give the same numbers.
-
-### 4.5  Closing
+### 4.4  Closing
 
 Thank you for listening. We are happy to take any questions, and we can jump back to any slide if it helps.
+
+### A.1  Appendix: the derivation is the same transformation
+
+A backup slide, in case anyone asks where the density formula comes from. If we run x equals mu plus G z backwards with the change of variables formula, the determinant of G gives the square root of the determinant of Sigma, and the squared length of z becomes the quadratic form. That is exactly the density from slide 1.4, and at our worked point both sides give the same numbers.

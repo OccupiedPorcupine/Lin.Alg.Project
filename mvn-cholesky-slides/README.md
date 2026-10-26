@@ -138,7 +138,7 @@ If the talk runs long, cut in this order (each is one line in `construct()`):
 2. 1.4 Reading the formula. Sampling never uses the density, and 3.1's
    contour ellipses still work without it.
 3. 2.4e The shortcut. Keep only its final "general pattern" reveal, or drop it.
-4. 3.3 The eigen view. If you cut it, remove "(from 3.3)" on slide 4.3.
+4. 3.3 The eigen view. If you cut it, remove "(eigen view)" on slide 4.3.
 5. 3.5 (the 3D bonus) is already off by default.
 
 Two slides are deliberately linked: slide 2.5 ends on exactly the frame that

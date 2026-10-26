@@ -94,13 +94,19 @@ def build() -> str:
     for filename in SCENE_FILES:
         tree = ast.parse((ROOT / "scenes" / filename).read_text())
         for cls in (n for n in tree.body if isinstance(n, ast.ClassDef)):
+            slides = [
+                m
+                for m in cls.body
+                if isinstance(m, ast.FunctionDef) and m.name.startswith("slide_")
+            ]
+            if not slides:  # a helper class, not a section
+                continue
             lines += [f"## {cls.name}", ""]
             section_name = _section_name(cls)
-            for method in cls.body:
-                if isinstance(method, ast.FunctionDef) and method.name.startswith("slide_"):
-                    notes = _slide_notes(method)
-                    heading = _slide_heading(method, section_name)
-                    lines += [f"### {heading}", "", notes or "(no notes)", ""]
+            for method in slides:
+                notes = _slide_notes(method)
+                heading = _slide_heading(method, section_name)
+                lines += [f"### {heading}", "", notes or "(no notes)", ""]
     return "\n".join(lines)
 
 

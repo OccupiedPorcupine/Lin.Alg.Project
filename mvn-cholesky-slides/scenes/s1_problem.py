@@ -628,11 +628,12 @@ class S1Problem(DeckSlide):
         ).move_to(axes.c2p(*mu))
         center = Dot(axes.c2p(*mu), radius=0.06, color=th.COLOR_TEXT)
         markers, spokes = VGroup(), VGroup()
-        for name, point, direction in zip("AB", points, (UR, UL), strict=True):
+        for name, point in zip("AB", points, strict=True):
             dot = Dot(axes.c2p(*point), radius=th.WORKED_DOT_RADIUS, color=th.COLOR_DIST)
             label = th.math(name, th.CAPTION_SIZE, th.COLOR_DIST)
             label.add_background_rectangle(color=th.BACKGROUND, opacity=0.9, buff=0.04)
-            markers.add(VGroup(dot, label.next_to(dot, direction, buff=0.08)))
+            outward = normalize(np.append(point - mu, 0.0))  # away from mu, clear of the spoke
+            markers.add(VGroup(dot, label.next_to(dot, outward, buff=0.08)))
             spokes.add(Line(center.get_center(), dot.get_center(), color=th.COLOR_TEXT))
 
         size = th.CAPTION_SIZE
@@ -830,9 +831,9 @@ class S1Problem(DeckSlide):
         goal = MathTex(
             r"\text{Goal: }\mathcal{N}(",
             fmt(mu),
-            ",",
+            r",\ ",
             fmt(var),
-            ")",
+            r"\,)",
             font_size=th.BODY_SIZE * th.MATH_SCALE,
         )
         goal_box = SurroundingRectangle(goal[3], color=th.COLOR_SIGMA, buff=0.07)
