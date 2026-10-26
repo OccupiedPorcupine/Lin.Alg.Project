@@ -2,8 +2,12 @@
 #
 #   make test          run the math tests
 #   make render-low    render all sections fast (480p) for checking
-#   make render        render all sections at 1080p for presenting
-#   make s2 QUALITY=h  render one section (s1..s4) at a chosen quality (l or h)
+#   make render-fast   render all sections at 1080p, 30 fps (about 2x faster than render)
+#   make render        render all sections at 1080p, 60 fps for presenting
+#   make s2 QUALITY=h  render one section (s1..s4) at a chosen quality (l or h);
+#                      add FPS=30 for the faster 30 fps version
+#
+# Every render shows a progress bar; Manim's full output goes to media/render.log.
 #   make present       open the presenter
 #   make html          export a single self-contained slides.html
 #   make notes         rebuild notes/speaker_notes.md from the scenes
@@ -17,13 +21,13 @@ export PATH := /Library/TeX/texbin:$(PATH)
 PYTHON := "$(BIN)/python"
 SLIDES := "$(BIN)/manim-slides"
 
-# Use --quality=<x>, not -q<x>: manim-slides reads the "h" in "-qh" as --help.
 QUALITY ?= l
-Q = --quality=$(QUALITY)
+FPS ?=
+RENDER = $(PYTHON) tools/render.py --quality=$(QUALITY) $(if $(FPS),--fps $(FPS))
 BONUS := $(shell $(PYTHON) -c "import config; print(int(config.ENABLE_3D_BONUS))")
-SCENES := S1Problem S2Solution S3Demo $(if $(filter 1,$(BONUS)),S3bThreeD) S4WrapUp
+SCENES := S1Problem S2Solution S3Sampler $(if $(filter 1,$(BONUS)),S3bThreeD) S4WrapUp
 
-.PHONY: test lint render-low render s1 s2 s3 s3b s4 present html notes clean
+.PHONY: test lint render-low render-fast render s1 s2 s3 s3b s4 present html notes clean
 
 test:
 	$(PYTHON) -m pytest -q
@@ -32,21 +36,24 @@ lint:
 	$(PYTHON) -m ruff check . && $(PYTHON) -m ruff format --check .
 
 s1:
-	$(SLIDES) render $(Q) scenes/s1_problem.py S1Problem
+	$(RENDER) s1
 s2:
-	$(SLIDES) render $(Q) scenes/s2_solution.py S2Solution
+	$(RENDER) s2
 s3:
-	$(SLIDES) render $(Q) scenes/s3_demo.py S3Demo
+	$(RENDER) s3
 s3b:
-	$(SLIDES) render $(Q) scenes/s3_demo.py S3bThreeD
+	$(RENDER) s3b
 s4:
-	$(SLIDES) render $(Q) scenes/s4_wrapup.py S4WrapUp
+	$(RENDER) s4
 
 render-low:
-	$(MAKE) s1 s2 s3 $(if $(filter 1,$(BONUS)),s3b) s4 QUALITY=l
+	$(PYTHON) tools/render.py --quality=l
+
+render-fast:
+	$(PYTHON) tools/render.py --quality=h --fps 30
 
 render:
-	$(MAKE) s1 s2 s3 $(if $(filter 1,$(BONUS)),s3b) s4 QUALITY=h
+	$(PYTHON) tools/render.py --quality=h
 
 present:
 	$(SLIDES) present $(SCENES)

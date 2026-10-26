@@ -1,4 +1,4 @@
-"""Colors, font sizes, layout constants, and the title, caption and footer helpers.
+"""Colors, font sizes, layout constants, and the title and caption helpers.
 
 Colors have a fixed meaning across the whole deck (see the semantic block
 below). Change a color here and every slide follows.
@@ -9,7 +9,6 @@ from __future__ import annotations
 from manim import (
     DOWN,
     LEFT,
-    RIGHT,
     UL,
     MarkupText,
     MathTex,
@@ -37,11 +36,14 @@ config.tex_template = TEX_TEMPLATE
 COLOR_Z = "#4ea1ff"  # independent samples z and N(0, I): blue
 COLOR_X = "#ff9f43"  # correlated samples x and N(mu, Sigma): orange
 COLOR_SIGMA = "#2ec4b6"  # Sigma, the blueprint: teal
-COLOR_L = "#ffd23f"  # L, the Cholesky factor: yellow
-COLOR_Z1 = COLOR_Z  # z1 component on the mixing slide: blue
-COLOR_Z2 = "#b48cff"  # z2 component on the mixing slide: purple
-COLOR_BAD = "#ff5c5c"  # errors and failures: red
-COLOR_GOOD = "#4cd964"  # confirmations: green
+COLOR_G = "#ffd23f"  # G, the Cholesky factor: yellow
+COLOR_DIST = "#ff6fb5"  # distance term of the density formula (1.4): pink
+COLOR_NORM = "#a3a9b3"  # normalizer term of the density formula (1.4): grey
+COLOR_Z1 = COLOR_Z  # z1 where z1 and z2 must be told apart: blue
+COLOR_Z2 = "#b48cff"  # z2 where z1 and z2 must be told apart: purple
+COLOR_BAD = "#ff5c5c"  # errors, failures, negative pivots: red
+COLOR_WARN = "#ffb627"  # warnings and zero pivots: amber
+COLOR_GOOD = "#4cd964"  # confirmations, positive pivots: green
 
 # --- Neutral colors ----------------------------------------------------------
 
@@ -64,11 +66,10 @@ MIN_SIZE = 24  # nothing on screen is smaller than this
 # LaTeX glyphs look about 20% smaller than Avenir at the same font_size, so
 # every formula is scaled up by this factor to read at the same size as text.
 MATH_SCALE = 1.2
-FOOTER_SIZE = MIN_SIZE
 
 # --- Layout ------------------------------------------------------------------
 
-EDGE_BUFF = 0.45  # distance from the frame edge for titles and footers
+EDGE_BUFF = 0.45  # distance from the frame edge for titles and side panels
 TITLE_GAP = 0.35  # gap between the title and the content below it
 CAPTION_Y = -3.05  # vertical position of the caption line at the bottom
 CONTENT_TOP = 2.6  # content should stay below this y
@@ -78,17 +79,67 @@ MAX_CONTENT_WIDTH = FRAME_WIDTH - 2 * EDGE_BUFF
 PANEL_LARGE = 4.4  # side of a single main scatter plot
 PANEL_MEDIUM = 3.5  # side of each plot in a side-by-side pair
 PANEL_SMALL = 2.0  # side of each plot in the 2x2 grid (slide 3.2)
-PANEL_TARGET = 4.1  # the target cloud beside the density formula (slide 1.3)
-PANEL_ROTATION = 3.8  # the rotating round cloud (slide 2.2)
-PANEL_SWEEP = 5.0  # the single large plot of the rho sweep (slide 3.3)
-HERO_MAX_WIDTH = 7.0  # box the hero NumberPlane must fit in (slide 2.6)
-HERO_MAX_HEIGHT = 6.5
+PANEL_STRIP = 3.0  # side of each plot in the recap strip (4.1)
 DENSITY_WIDTH = 11.5  # 1D bell-curve axes (slide 1.6)
 DENSITY_HEIGHT = 2.9
-PANEL_ROW = 1.8  # side of each plot in the two attempt rows on slide 1.8
-PANEL_STRIP = 3.0  # side of each plot in the recap strip
-BAR_WIDTH = 8.6  # full width of the stacked variance bar (slide 2.5)
-BAR_HEIGHT = 0.55
+
+# Gaussian process panel (1.1 and its replay on 4.2): same size on both slides.
+GP_WIDTH = 10.0
+GP_HEIGHT = 3.6
+GP_DOT_RADIUS = 0.06
+
+# Hero animation (2.5). Section 3 opens on this exact frame, so both sections
+# build it from these values (see components.hero_final_frame).
+HERO_MAX_WIDTH = 7.0  # box the hero NumberPlane must fit in
+HERO_MAX_HEIGHT = 6.5
+HERO_PLANE_CENTER = (-3.2, -0.45)
+HERO_CODE_Y = 0.3  # vertical position of the NumPy code block beside the plane
+
+# Pivot gauge (3.4, thumbnail on 4.3): a vertical bar for the second pivot.
+GAUGE_HEIGHT = 2.6  # screen height of a pivot of 1
+GAUGE_WIDTH = 0.55
+GAUGE_MIN = -0.5  # lowest pivot the gauge can show (1.2^2 = 1.44 gives -0.44)
+
+# --- Section 1 layout (scenes/s1_problem.py) ---------------------------------
+
+HIST_WIDTH = 10.0  # portfolio return histograms (1.1)
+HIST_HEIGHT = 3.2
+HEATMAP_CELL = 0.8  # side of one cell of the correlation heatmaps (1.1)
+PANEL_CODE_CLOUD = 4.0  # the N(0, I) cloud beside the code (1.2)
+PANEL_THUMB = 1.9  # the shrunken blue cloud in the corner (1.3)
+PANEL_FORMULA = 4.0  # the cloud with points A and B (1.4)
+FORMULA_BELL_WIDTH = 3.4  # the small bell curve beside the 1D formula (1.4)
+FORMULA_BELL_HEIGHT = 1.4
+PANEL_ROW = 1.8  # side of each plot in the two attempt rows (1.7)
+
+# --- Section 2 layout (scenes/s2_solution.py) --------------------------------
+
+PANEL_ROTATION = 3.4  # the rotating round cloud (2.2), below the legend
+ROTATION_PANEL_CENTER = (4.3, -0.95)
+TRIANGLE_SOLVE_X = -1.2  # left edge of the solving steps on 2.3
+TRIANGLE_KEY_Y = -2.1  # the boxed "Cholesky: Sigma = G G^T" line on 2.3
+HERO_SIDE_CENTER = (3.6, 1.1)  # x = mu + G z with G and mu, beside the hero plane (2.5)
+
+# --- Section 3 layout (scenes/s3_sampler.py) ---------------------------------
+
+PANEL_SWEEP = 5.0  # the single large plot of the rho sweep (slide 3.4)
+VERIFY_PLANE_HEIGHT = 5.2  # 3.1 shrinks the hero plane to this height to make room
+VERIFY_PLANE_CENTER = (-3.7, -0.15)
+DEMO_PANEL = 2.5  # side of each plot in the row of four on slide 3.2
+EIGEN_PANEL = 4.6  # the cloud on the eigen slide (3.3)
+EIGEN_TEST_PANEL = 3.2  # the small plane where Sigma is applied to test arrows (3.3)
+EIGEN_TEST_CENTER = (4.9, 0.75)  # top right, so the readouts fit underneath it on the left
+EIGEN_READOUT_Y = -0.75  # first Sigma-times-arrow readout on 3.3
+SWEEP_GAUGE_CENTER = (6.1, -0.55)  # the pivot gauge at the right edge of 3.4
+
+# --- Section 4 layout (scenes/s4_wrapup.py) ----------------------------------
+
+LIMITS_THUMB_SCALE = 0.5  # pivot gauge thumbnail on 4.3, relative to the 3.4 gauge
+LIMITS_THUMB_X = 5.0  # x position of the thumbnails on 4.3
+LIMITS_DIM_OPACITY = 0.5  # earlier limits dim when the next one appears
+BOOKEND_DIM_OPACITY = 0.25  # earlier curves on 4.2 dim when the next one is drawn
+LIMITS_THUMB_WIDTH = 2.4  # portfolio histogram thumbnail on 4.3
+LIMITS_THUMB_HEIGHT = 1.0
 
 # --- Points and lines --------------------------------------------------------
 
@@ -148,12 +199,6 @@ def caption(content: str, color: str = COLOR_TEXT) -> MarkupText:
     line = markup(content, CAPTION_SIZE, color)
     line.scale_to_fit_width(min(line.width, MAX_CONTENT_WIDTH))
     return line.move_to([0, CAPTION_Y, 0])
-
-
-def footer(content: str) -> Text:
-    """Small section indicator for the bottom-right corner (kept on the canvas)."""
-    label = text(content, FOOTER_SIZE, COLOR_MUTED)
-    return label.to_edge(DOWN, buff=0.2).to_edge(RIGHT, buff=0.3)
 
 
 def below_title(mobject: VGroup, title: VGroup) -> VGroup:

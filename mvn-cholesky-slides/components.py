@@ -1,7 +1,9 @@
-"""Reusable Manim builders: axes, point clouds, ellipses, matrices, panels, marks.
+"""Reusable Manim builders: axes, point clouds, ellipses, matrices, panels, marks,
+plus the pieces shared between sections (Gaussian process curves, histograms,
+the pivot gauge and the hero frame).
 
 Also holds ``DeckSlide``, the shared base class that gives every section the
-same footer, speaker-note handling and slide-to-slide transition.
+same section slide, speaker-note handling and slide-to-slide transition.
 """
 
 from __future__ import annotations
@@ -77,7 +79,7 @@ def make_labeled_matrix(
     size: float = th.BODY_SIZE,
     fixed: bool = False,
 ) -> VGroup:
-    """'symbol = [matrix]', for example a teal Sigma or a yellow L."""
+    """'symbol = [matrix]', for example a teal Sigma or a yellow G."""
     label = th.math(symbol + "=", size, color)
     matrix = make_matrix(values, color, size, fixed)
     return VGroup(label, matrix).arrange(RIGHT, buff=0.2)
@@ -86,7 +88,7 @@ def make_labeled_matrix(
 def make_symbolic_matrix(
     entries: Sequence[Sequence[str]], color: str, size: float = th.BODY_SIZE
 ) -> Matrix:
-    """A matrix whose entries are LaTeX strings, for formulas like L = [[1, 0], [rho, ...]].
+    """A matrix whose entries are LaTeX strings, for formulas like G = [[1, 0], [rho, ...]].
 
     Manim spaces columns center to center, so the spacing is set from the widest
     entry; a fixed value leaves single digits floating far apart.
@@ -332,6 +334,248 @@ def make_code(snippet: str) -> Code:
     )
 
 
+def make_dim_overlay(opacity: float = 0.85) -> FullScreenRectangle:
+    """Near-black sheet over the whole frame. Manim has no real blur, so this
+    fakes one: everything behind it dims and new text on top stands out."""
+    overlay = FullScreenRectangle()
+    return overlay.set_fill(th.BACKGROUND, opacity=opacity).set_stroke(width=0)
+
+
+# --- Gaussian process panel (1.1, replayed on 4.2) --------------------------------
+
+
+def make_gp_axes() -> Axes:
+    """Axes for the Gaussian process curves: x over GP_X_RANGE, y over N(0, 1) values.
+
+    The y range holds standard normal draws out to AXIS_N_SD, so the jagged
+    dots (which are N(0, 1)) never leave the axes, and neither do the curves.
+    """
+    y_lim = mm.axis_limits_1d([0.0], [1.0], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
+    return Axes(
+        x_range=[cfg.GP_X_RANGE[0], cfg.GP_X_RANGE[1], 1],
+        y_range=[y_lim[0], y_lim[1], 1],
+        x_length=th.GP_WIDTH,
+        y_length=th.GP_HEIGHT,
+        tips=False,
+        axis_config={"color": th.COLOR_MUTED, "stroke_width": th.AXIS_STROKE},
+        x_axis_config={"include_ticks": False},
+        y_axis_config={"include_ticks": False},
+    )
+
+
+def gp_points(values: np.ndarray, axes: Axes) -> list[np.ndarray]:
+    """Screen positions of one curve's values at the GP grid's x positions."""
+    xs = mm.gp_grid(cfg.GP_X_RANGE, cfg.GP_N_POINTS)
+    return [axes.c2p(x, y) for x, y in zip(xs, values, strict=True)]
+
+
+def make_gp_dots(values: np.ndarray, axes: Axes, color: str = th.COLOR_Z) -> VGroup:
+    """One dot per grid point: the 60 values of one draw, before or after G."""
+    return VGroup(*[Dot(p, radius=th.GP_DOT_RADIUS, color=color) for p in gp_points(values, axes)])
+
+
+def make_gp_jagged_line(values: np.ndarray, axes: Axes, color: str = th.COLOR_Z) -> VMobject:
+    """Straight segments joining the dots, which shows how jagged independent draws are."""
+    line = VMobject().set_points_as_corners(gp_points(values, axes))
+    return line.set_stroke(color, width=2, opacity=0.6)
+
+
+def make_gp_curve(values: np.ndarray, axes: Axes, color: str = th.COLOR_X) -> VMobject:
+    """A smooth curve through the values (used for x = G z, which is smooth)."""
+    curve = VMobject().set_points_smoothly(gp_points(values, axes))
+    return curve.set_stroke(color, width=5)
+
+
+def make_gp_states(z_row: np.ndarray, x_row: np.ndarray, axes: Axes) -> tuple[VGroup, VGroup]:
+    """Start and end states of one jagged-to-smooth morph: Transform(start, end).
+
+    Start: the 60 independent values z (blue dots joined by a faint jagged
+    line). End: the same dots moved to x = G z (orange) on a smooth curve.
+    Slides 1.1 and 4.2 both animate exactly this, so 4.2 is a true replay.
+    """
+    start = VGroup(make_gp_jagged_line(z_row, axes), make_gp_dots(z_row, axes, th.COLOR_Z))
+    end = VGroup(make_gp_curve(x_row, axes), make_gp_dots(x_row, axes, th.COLOR_X))
+    return start, end
+
+
+# --- Histograms (1.1 portfolio panel, 4.3 thumbnail) --------------------------------
+
+
+def make_histogram(
+    values: np.ndarray, axes: Axes, bins: int, color: str, opacity: float = 0.45
+) -> VGroup:
+    """Density-scaled histogram drawn as bars on ``axes`` (over its full x range).
+
+    Density scaling (area 1) lets two histograms of different spread share
+    one y axis fairly, the same way two bell curves would.
+    """
+    heights, edges = np.histogram(values, bins=bins, range=axes.x_range[:2], density=True)
+    bars = VGroup()
+    for left, right, height in zip(edges[:-1], edges[1:], heights, strict=True):
+        bottom_left, top_right = axes.c2p(left, 0), axes.c2p(right, height)
+        bar = Rectangle(
+            width=top_right[0] - bottom_left[0], height=max(top_right[1] - bottom_left[1], 1e-3)
+        )
+        bar.move_to(bottom_left, aligned_edge=DL)
+        bars.add(bar)
+    return bars.set_fill(color, opacity).set_stroke(color, width=1.5, opacity=0.9)
+
+
+# --- Pivot gauge (3.4, thumbnail on 4.3) ------------------------------------------------
+
+
+def pivot_color(pivot: float) -> str:
+    """Green while the pivot is positive, amber at zero, red below zero."""
+    if abs(pivot) < 1e-9:
+        return th.COLOR_WARN
+    return th.COLOR_GOOD if pivot > 0 else th.COLOR_BAD
+
+
+def make_pivot_gauge(pivot: float, center: np.ndarray = ORIGIN, scale: float = 1.0) -> VGroup:
+    """A vertical bar gauge for the second pivot 1 - rho^2.
+
+    The frame always spans GAUGE_MIN to 1, so its position never moves while
+    the bar inside grows, shrinks or drops below the zero line. Rebuild it
+    each frame (always_redraw) with the current pivot and the same ``center``.
+    Returns VGroup(frame, zero_line, bar, labels).
+    """
+    unit = th.GAUGE_HEIGHT * scale
+    width = th.GAUGE_WIDTH * scale
+    frame = Rectangle(width=width, height=(1 - th.GAUGE_MIN) * unit)
+    frame.set_stroke(th.COLOR_MUTED, width=2)
+    frame.move_to(center)
+    zero_y = frame.get_bottom()[1] - th.GAUGE_MIN * unit
+    zero_line = Line(
+        [frame.get_left()[0] - 0.12 * scale, zero_y, 0],
+        [frame.get_right()[0] + 0.12 * scale, zero_y, 0],
+    ).set_stroke(th.COLOR_TEXT, width=3)
+    shown = float(np.clip(pivot, th.GAUGE_MIN, 1.0))
+    bar = Rectangle(width=0.8 * width, height=max(abs(shown) * unit, 0.02 * scale))
+    bar.set_fill(pivot_color(pivot), opacity=0.9).set_stroke(width=0)
+    bar.move_to([center[0], zero_y, 0], aligned_edge=DOWN if shown >= 0 else UP)
+    labels = VGroup(
+        th.math("1", th.MIN_SIZE * scale, th.COLOR_MUTED).next_to(
+            frame.get_corner(UL), LEFT, buff=0.1
+        ),
+        th.math("0", th.MIN_SIZE * scale, th.COLOR_MUTED).next_to(zero_line, LEFT, buff=0.1),
+    )
+    return VGroup(frame, zero_line, bar, labels)
+
+
+# --- Hero frame (2.5 ends on it, 3.1 starts from it) ---------------------------------
+
+HERO_NUMPY_SNIPPET = """\
+G = np.linalg.cholesky(Sigma)
+Z = rng.standard_normal((n, 2))
+X = mu + Z @ G.T"""
+
+
+def make_hero_plane() -> NumberPlane:
+    """The fixed background plane of the hero animation.
+
+    Its range covers all three clouds of the animation: z at 0, G z at 0
+    (wider), and mu + G z at mu.
+    """
+    x_lim, y_lim = mm.axis_limits(
+        [np.zeros(2), np.zeros(2), cfg.MAIN_MU],
+        [np.eye(2), cfg.MAIN_SIGMA, cfg.MAIN_SIGMA],
+        cfg.AXIS_N_SD,
+        cfg.AXIS_ROUND_STEP,
+    )
+    plane = make_plane(x_lim, y_lim, th.HERO_MAX_WIDTH, th.HERO_MAX_HEIGHT)
+    return plane.move_to([*th.HERO_PLANE_CENTER, 0])
+
+
+def make_hero_grid(plane: NumberPlane) -> NumberPlane:
+    """The bright grid over z in [-HERO_GRID_HALF_WIDTH, HERO_GRID_HALF_WIDTH]^2 that G moves."""
+    extent = cfg.HERO_GRID_HALF_WIDTH
+    unit = plane.get_x_unit_size()
+    grid = NumberPlane(
+        x_range=[-extent, extent, 1],
+        y_range=[-extent, extent, 1],
+        x_length=2 * extent * unit,
+        y_length=2 * extent * unit,
+        background_line_style={
+            "stroke_color": th.COLOR_TEXT,
+            "stroke_opacity": 0.6,
+            "stroke_width": 2,
+        },
+        axis_config={"stroke_color": th.COLOR_TEXT, "stroke_opacity": 0.6},
+    )
+    return grid.shift(plane.c2p(0, 0) - grid.c2p(0, 0))
+
+
+def through_data(plane: NumberPlane, fn):
+    """Turn a map on data coordinates into a map on screen points.
+
+    The hero plane is not unit-scale, so ApplyMatrix (which acts on screen
+    coordinates) would be wrong. Instead: screen -> plane.p2c -> fn -> plane.c2p.
+    """
+    return lambda point: plane.c2p(*fn(np.array(plane.p2c(point))))
+
+
+def make_worked_marker(position: np.ndarray) -> VGroup:
+    """The highlighted worked point: a white dot with a ring around it."""
+    dot = Dot(position, radius=th.WORKED_DOT_RADIUS, color=th.COLOR_TEXT)
+    ring = Circle(radius=th.WORKED_RING_RADIUS, color=th.COLOR_TEXT, stroke_width=3)
+    return VGroup(dot, ring.move_to(position))
+
+
+def make_point_label(tex: str, color: str, anchor: Mobject) -> VGroup:
+    """A math label on a dark backing so it stays readable over the dots."""
+    label = th.math(tex, th.CAPTION_SIZE, color)
+    label.add_background_rectangle(color=th.BACKGROUND, opacity=0.95, buff=0.06)
+    return label.next_to(anchor, UR, buff=0.1)
+
+
+def make_coordinate_guides(plane: NumberPlane, point: np.ndarray) -> VGroup:
+    """Dashed lines from the point to both axes, labeled with its coordinates."""
+    to_x_axis = DashedLine(plane.c2p(*point), plane.c2p(point[0], 0), color=th.COLOR_X)
+    to_y_axis = DashedLine(plane.c2p(*point), plane.c2p(0, point[1]), color=th.COLOR_X)
+    x_value = th.math(fmt(point[0]), th.MIN_SIZE, th.COLOR_X)
+    x_value.next_to(plane.c2p(point[0], 0), DOWN, buff=0.12)
+    y_value = th.math(fmt(point[1]), th.MIN_SIZE, th.COLOR_X)
+    y_value.next_to(plane.c2p(0, point[1]), LEFT, buff=0.12)
+    for value in (x_value, y_value):
+        value.add_background_rectangle(color=th.BACKGROUND, opacity=0.85, buff=0.04)
+    return VGroup(to_x_axis, to_y_axis, x_value, y_value)
+
+
+def make_hero_code() -> VGroup:
+    """'In NumPy' and the three-line sampler, to the right of the hero plane."""
+    heading = th.text("In NumPy", th.CAPTION_SIZE, th.COLOR_MUTED)
+    block = VGroup(heading, make_code(HERO_NUMPY_SNIPPET)).arrange(
+        DOWN, buff=0.25, aligned_edge=LEFT
+    )
+    return block.to_edge(RIGHT, buff=th.EDGE_BUFF).set_y(th.HERO_CODE_Y)
+
+
+class HeroFrame(VGroup):
+    """The last frame of slide 2.5, rebuilt from scratch.
+
+    Slide 2.5 animates its way to this state; Section 3 opens by adding it
+    instantly, so the orange cloud carries across the section boundary. Both
+    use this class, so the two frames cannot drift apart. Draw order is the
+    order of the submobjects: plane, grid, cloud, marker, label, guides, code.
+    """
+
+    def __init__(self, z_display: np.ndarray, chol: np.ndarray) -> None:
+        super().__init__()
+        mu = np.asarray(cfg.MAIN_MU, dtype=float)
+        self.plane = make_hero_plane()
+        self.grid = make_hero_grid(self.plane)
+        self.grid.apply_function(through_data(self.plane, lambda data: chol @ data + mu))
+        self.cloud = make_point_cloud(mm.transform(z_display, mu, chol), self.plane, th.COLOR_X)
+        self.worked_x = mm.transform(cfg.WORKED_Z, mu, chol)
+        self.marker = make_worked_marker(self.plane.c2p(*self.worked_x))
+        self.label = make_point_label(
+            r"\mathbf{x} = " + fmt_vector(self.worked_x), th.COLOR_X, self.marker[0]
+        )
+        self.guides = make_coordinate_guides(self.plane, self.worked_x)
+        self.code = make_hero_code()
+        self.add(self.plane, self.grid, self.cloud, self.marker, self.label, self.guides, self.code)
+
+
 # --- Marks and arrows ------------------------------------------------------------------
 
 
@@ -372,8 +616,7 @@ def boxed(content: Mobject, color: str = th.COLOR_MUTED, buff: float = 0.3) -> V
 class DeckSlide(Slide):
     """Base class for the four sections.
 
-    Gives every section the same four things:
-      * a footer on the manim-slides canvas, so it survives transitions;
+    Gives every section the same three things:
       * ``show_section_slide(subtitle)``, the opening slide of the section;
       * ``begin_slide(notes)``, which starts a slide, attaches its notes and
         fades out the previous slide (the one transition used everywhere);
@@ -381,7 +624,7 @@ class DeckSlide(Slide):
     """
 
     section_number: int = 0  # each section sets these two, for example 1 and "Problem";
-    section_name: str = ""  # they feed both the footer and the section slide
+    section_name: str = ""  # they appear on the section's opening slide
 
     def setup(self) -> None:
         super().setup()
@@ -393,10 +636,13 @@ class DeckSlide(Slide):
         # of the N_STATS sample, so the statistics describe the dots we see.
         self.z_stats = mm.standard_normal_samples(cfg.N_STATS, 2, cfg.RANDOM_SEED)
         self.z_display = self.z_stats[: cfg.N_DISPLAY]
-        self.main_chol = mm.cholesky_factor(cfg.MAIN_SIGMA)
-        if self.section_name:
-            self.add_to_canvas(footer=th.footer(f"{self.section_number}  {self.section_name}"))
-            self.add(self.canvas["footer"])
+        self.main_chol = mm.cholesky_factor(cfg.MAIN_SIGMA)  # G for the main example
+        # Gaussian process draws: each row of gp_z is 60 independent values and
+        # the same row of gp_x is the smooth curve G z. Sections 1 and 4 both
+        # use these, so 4.2 replays exactly the curves of 1.1.
+        gp_xs = mm.gp_grid(cfg.GP_X_RANGE, cfg.GP_N_POINTS)
+        self.gp_z = mm.standard_normal_samples(cfg.GP_N_CURVES, cfg.GP_N_POINTS, cfg.RANDOM_SEED)
+        self.gp_x = mm.gp_curves(self.gp_z, gp_xs, cfg.GP_LENGTH_SCALE, cfg.GP_JITTER)
 
     def begin_slide(self, notes: str) -> None:
         """Start a new slide.
@@ -407,7 +653,7 @@ class DeckSlide(Slide):
         """
         self.next_slide(notes=notes)
         self.current_notes = notes
-        leftovers = self.mobjects_without_canvas
+        leftovers = self.mobjects
         if leftovers:
             self.play(FadeOut(*leftovers), run_time=cfg.T_SHORT)
 

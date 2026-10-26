@@ -1,7 +1,8 @@
 """Section 1: the problem.
 
 Computers give us independent noise N(0, I); we want correlated data
-N(mu, Sigma). This section shows the gap and why the obvious fixes fail.
+N(mu, Sigma). This section shows where that matters, reads the density
+formula, and shows why the obvious "square roots" fail.
 """
 
 import sys
@@ -18,19 +19,21 @@ import config as cfg
 import mvn_math as mm
 import theme as th
 from components import (
-    make_check_mark,
-    boxed,
     DeckSlide,
     Panel,
     axis_labels,
     fade_in_cloud,
     fmt,
     make_bell_curve,
+    make_check_mark,
     make_code,
     make_cov_ellipse,
     make_cross_mark,
     make_density_axes,
-    make_mean_sd_guides,
+    make_dim_overlay,
+    make_gp_axes,
+    make_gp_states,
+    make_histogram,
     make_labeled_matrix,
     make_matrix,
     make_point_cloud,
@@ -41,12 +44,45 @@ from components import (
 )
 
 IDENTITY = np.eye(2)
-SIGMA_SYMBOLS = [[r"\sigma_{xx}", r"\sigma_{xy}"], [r"\sigma_{yx}", r"\sigma_{yy}"]]
-ENTRY_INDEX = [(0, 0), (0, 1), (1, 0), (1, 1)]  # (row, col) of each entry, in Matrix order
+
+# Pieces of the density formula on slide 1.4, with the role that colors them.
+# Each row is (1D rearranged, nD); they sit in the same column on screen.
+FORMULA_1D = [
+    "f(x) =",
+    r"\frac{1}{\sqrt{2\pi\sigma^2}}",
+    r"\exp\Big(",
+    r"-\frac{(x-\mu)^2}{2\sigma^2}",
+    r"\Big)",
+]
+FORMULA_1D_REARRANGED = [
+    "f(x) =",
+    r"(2\pi)^{-1/2}",
+    r"(\sigma^2)^{-1/2}",
+    r"\exp\Big(",
+    r"-\tfrac{1}{2}",
+    r"(x-\mu)",
+    r"(\sigma^2)^{-1}",
+    r"(x-\mu)",
+    r"\Big)",
+]
+FORMULA_ND = [
+    r"f(\mathbf{x}) =",
+    r"(2\pi)^{-k/2}",
+    r"|\Sigma|^{-1/2}",
+    r"\exp\Big(",
+    r"-\tfrac{1}{2}",
+    r"(\mathbf{x}-\boldsymbol{\mu})^T",
+    r"\Sigma^{-1}",
+    r"(\mathbf{x}-\boldsymbol{\mu})",
+    r"\Big)",
+]
+# Role of each piece of the rearranged and nD formulas (same order as above).
+FORMULA_ROLES = [None, "norm", "norm", None, "dist", "dist", "spread", "dist", None]
+ROLE_COLORS = {"norm": th.COLOR_NORM, "dist": th.COLOR_DIST, "spread": th.COLOR_SIGMA}
 
 
 class S1Problem(DeckSlide):
-    """Section 1: what we have, what we want, and why naive fixes fail."""
+    """Section 1: where it matters, what we have, what we want, and why naive fixes fail."""
 
     section_number = 1
     section_name = "Problem"
@@ -57,11 +93,10 @@ class S1Problem(DeckSlide):
         self.slide_1_1_hook()
         self.slide_1_2_what_computers_give()
         self.slide_1_3_what_we_want()
-        self.slide_1_4_what_each_entry_does()
+        self.slide_1_4_reading_the_formula()
         self.slide_1_5_the_question()
         self.slide_1_6_one_d_warmup()
-        self.slide_1_7_the_trap()
-        self.slide_1_8_matrix_square_root()
+        self.slide_1_7_nd_catch()
 
     # --- 1.0 -----------------------------------------------------------------
 
@@ -88,14 +123,13 @@ class S1Problem(DeckSlide):
         self.play(Write(title), run_time=cfg.T_LONG)
         self.play(FadeIn(subtitle, shift=0.2 * UP), FadeIn(presenter), run_time=cfg.T_MEDIUM)
 
-    # --- 1.0 -----------------------------------------------------------------
-
     def slide_1_0_section(self) -> None:
         """Section slide: number, name and a one-line preview of the section."""
         self.begin_slide(
             notes="""
-            Let's start with the problem. We will look at what a computer can
-            give us, what we actually want, and why the obvious fixes fail.
+            Let's start with the problem. We will see where correlated
+            randomness matters, what a computer can give us, what we actually
+            want, and why the obvious fixes fail.
             """
         )
         self.show_section_slide("What we have, what we want, and why it is not obvious")
@@ -103,131 +137,367 @@ class S1Problem(DeckSlide):
     # --- 1.1 -----------------------------------------------------------------
 
     def slide_1_1_hook(self) -> None:
-        """Independent vs correlated stock returns. Point: real variables move together."""
+        """Three uses, one per click. Point: all of them need random numbers that move together."""
         self.begin_slide(
-            notes="""
-            Here are simulated daily returns for two stocks. On the left they
-            are independent, so the cloud is round. On the right they tend to
-            move together, which tilts the cloud. If we want to simulate a
-            portfolio honestly, we need draws like the ones on the right.
+            notes=f"""
+            Before any math, here are three places where correlated randomness
+            matters. A bank simulating a portfolio underestimates its risk if it
+            treats the stocks as independent. A random smooth curve is really one
+            draw from a {cfg.GP_N_POINTS} dimensional normal, and synthetic data is only useful
+            if it keeps the real correlations. All three need random numbers that
+            move together.
             """
         )
-        title = th.slide_title("Real variables move together")
-        heading = th.text("Stock A vs Stock B returns (simulated)", th.CAPTION_SIZE, th.COLOR_MUTED)
-        heading.next_to(title, DOWN, buff=th.TITLE_GAP)
+        self._hook_portfolio()
+        self.reveal()
+        self.play(FadeOut(*self.mobjects), run_time=cfg.T_SHORT)
+        self._hook_gaussian_processes()
+        self.reveal()
+        self.play(FadeOut(*self.mobjects), run_time=cfg.T_SHORT)
+        self._hook_synthetic_data()
+        self.reveal()
 
-        correlated = mm.correlation_matrix(cfg.HOOK_RHO)
-        half_width = mm.shared_half_width(
-            [IDENTITY, correlated], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP
-        )
-        left = Panel(
-            "Independent", IDENTITY, self.z_display, half_width, th.PANEL_MEDIUM, th.COLOR_Z, None
-        )
-        right = Panel(
-            "Correlated", correlated, self.z_display, half_width, th.PANEL_MEDIUM, th.COLOR_X, None
-        )
-        for panel in (left, right):
-            panel.add(axis_labels(panel.axes, "Stock A", "Stock B"))
-        VGroup(left, right).arrange(RIGHT, buff=1.8).next_to(heading, DOWN, buff=0.2)
-        caption = th.caption("To simulate a portfolio, we need random draws that move together.")
+        message = th.text("All three need random numbers that move together.", th.TITLE_SIZE)
+        message.scale_to_fit_width(min(message.width, th.MAX_CONTENT_WIDTH))
+        self.play(FadeIn(make_dim_overlay()), run_time=cfg.T_SHORT)
+        self.play(Write(message), run_time=cfg.T_MEDIUM)
+
+    def _hook_portfolio(self) -> None:
+        """Two scatter plots of stock returns morph into portfolio return histograms."""
+        title = th.slide_title("Monte Carlo portfolio risk")
+        heading = th.text("Stock A vs Stock B returns (simulated)", th.CAPTION_SIZE, th.COLOR_MUTED)
+        heading.next_to(title, DOWN, buff=th.TITLE_GAP).set_x(0)
+
+        rhos = (cfg.PORTFOLIO_RHO_INDEPENDENT, cfg.PORTFOLIO_RHO_CORRELATED)
+        colors = (th.COLOR_Z, th.COLOR_X)
+        names = ("Independent", "Correlated")
+        sigmas = [mm.correlation_matrix(rho) for rho in rhos]
+        half_width = mm.shared_half_width(sigmas, cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
+        panels = VGroup()
+        for name, rho, sigma, color in zip(names, rhos, sigmas, colors, strict=True):
+            panel = Panel(
+                f"{name}: ρ = {fmt(rho)}",
+                sigma,
+                self.z_display,
+                half_width,
+                th.PANEL_MEDIUM,
+                color,
+                None,
+            )
+            panel.labels = axis_labels(panel.axes, "Stock A", "Stock B")
+            panel.add(panel.labels)
+            panels.add(panel)
+        panels.arrange(RIGHT, buff=1.8).next_to(heading, DOWN, buff=0.25)
 
         self.play(FadeIn(title), FadeIn(heading), run_time=cfg.T_SHORT)
         self.play(
-            *[FadeIn(VGroup(p.axes, p.label, p[-1])) for p in (left, right)],
+            *[FadeIn(VGroup(p.axes, p.label, p.labels)) for p in panels], run_time=cfg.T_SHORT
+        )
+        self.play(*[fade_in_cloud(p.cloud) for p in panels])
+        self.reveal()
+
+        # Same z for both rho values, so the histograms differ only by correlation.
+        returns = [
+            mm.portfolio_returns(cfg.PORTFOLIO_WEIGHTS, rho, cfg.N_STATS, cfg.RANDOM_SEED)
+            for rho in rhos
+        ]
+        spreads = [float(np.std(r)) for r in returns]
+        x_lim = mm.axis_limits_1d([0.0, 0.0], spreads, cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
+        tallest = max(
+            np.histogram(r, bins=cfg.PORTFOLIO_HIST_BINS, range=x_lim, density=True)[0].max()
+            for r in returns
+        )
+        axes = make_density_axes(x_lim, 1.15 * tallest, th.HIST_WIDTH, th.HIST_HEIGHT)
+        weights = "/".join(f"{w:.0%}".rstrip("%") for w in cfg.PORTFOLIO_WEIGHTS)
+        axis_name = th.text(
+            f"Portfolio return ({weights} weights, simulated)", th.MIN_SIZE, th.COLOR_MUTED
+        )
+        axis_name.next_to(axes, DOWN, buff=0.45)
+        VGroup(axes, axis_name).next_to(heading, DOWN, buff=0.9).set_x(0)
+        histograms = [
+            make_histogram(r, axes, cfg.PORTFOLIO_HIST_BINS, color)
+            for r, color in zip(returns, colors, strict=True)
+        ]
+
+        var_lines, legend = VGroup(), VGroup()
+        level = f"{cfg.VAR_LEVEL:.0%}".replace("%", r"\%")
+        for rho, r, spread, color in zip(rhos, returns, spreads, colors, strict=True):
+            var = mm.value_at_risk(r, cfg.VAR_LEVEL)
+            var_lines.add(
+                DashedLine(axes.c2p(var, 0), axes.c2p(var, 0.8 * tallest), color=th.COLOR_BAD)
+            )
+            legend.add(
+                th.math(
+                    rf"\rho = {fmt(rho)}:\ \ \text{{sd }} {fmt(spread, fixed=True)},"
+                    rf"\ \ {level}\ \text{{VaR }} {fmt(var, fixed=True)}",
+                    th.CAPTION_SIZE,
+                    color,
+                )
+            )
+        legend.arrange(DOWN, buff=0.15, aligned_edge=LEFT)
+        legend.next_to(axes.c2p(x_lim[1], tallest), DL, buff=0).shift(0.1 * UP)
+        var_label = th.text(f"{cfg.VAR_LEVEL:.0%} worst case", th.MIN_SIZE, th.COLOR_BAD).next_to(
+            var_lines, UP, buff=0.12
+        )
+        caption = th.caption("Ignore correlation and you underestimate risk.")
+
+        new_heading = th.text(
+            "Portfolio returns: independent vs correlated stocks", th.CAPTION_SIZE, th.COLOR_MUTED
+        ).move_to(heading)
+        self.play(
+            FadeOut(VGroup(*[VGroup(p.axes, p.label, p.labels) for p in panels])),
+            Transform(heading, new_heading),
+            Create(axes),
+            FadeIn(axis_name),
             run_time=cfg.T_SHORT,
         )
-        self.play(fade_in_cloud(left.cloud), fade_in_cloud(right.cloud))
+        self.play(
+            *[Transform(panel.cloud, hist) for panel, hist in zip(panels, histograms, strict=True)],
+            run_time=cfg.T_LONG,
+        )
+        self.play(FadeIn(legend), run_time=cfg.T_SHORT)
+        self.play(Create(var_lines), FadeIn(var_label), run_time=cfg.T_MEDIUM)
         self.play(FadeIn(caption), run_time=cfg.T_SHORT)
+
+    def _hook_gaussian_processes(self) -> None:
+        """Jagged independent values become smooth random curves (replayed on 4.2)."""
+        title = th.slide_title("Gaussian processes")
+        axes = make_gp_axes().next_to(title, DOWN, buff=1.0).set_x(0)
+        before = th.text(
+            f"{cfg.GP_N_POINTS} independent random values", th.CAPTION_SIZE, th.COLOR_Z
+        )
+        after = th.text("One smooth random curve", th.CAPTION_SIZE, th.COLOR_X)
+        for label in (before, after):
+            label.next_to(axes, UP, buff=0.2).align_to(axes, LEFT)
+        caption = th.caption(
+            f"A random smooth curve is one sample from a {cfg.GP_N_POINTS}-dimensional normal."
+        )
+
+        self.play(FadeIn(title), Create(axes), run_time=cfg.T_SHORT)
+        previous = None
+        for index in range(cfg.GP_N_CURVES):
+            start, end = make_gp_states(self.gp_z[index], self.gp_x[index], axes)
+            fade_previous = [previous.animate.set_opacity(0.25)] if previous else []
+            self.play(*fade_previous, FadeIn(start, lag_ratio=0.02), run_time=cfg.T_MEDIUM)
+            if index == 0:
+                self.play(FadeIn(before), run_time=cfg.T_SHORT)
+            self.play(Transform(start, end), run_time=cfg.T_LONG)
+            if index == 0:
+                self.play(Transform(before, after), FadeIn(caption), run_time=cfg.T_SHORT)
+            previous = start
+
+    def _hook_synthetic_data(self) -> None:
+        """Original and synthetic correlation heatmaps, then synthetic rows ticking in."""
+        title = th.slide_title("Synthetic data generation")
+        original = np.asarray(cfg.SYNTH_CORRELATION)
+        z = mm.standard_normal_samples(cfg.N_STATS, len(original), cfg.RANDOM_SEED)
+        rows = mm.transform(z, np.zeros(len(original)), mm.cholesky_factor(original))
+        measured = mm.sample_corr(rows)
+
+        left = self._heatmap(original, "Original data (illustrative)", fixed=False)
+        right = self._heatmap(measured, "Synthetic copy", fixed=True)
+        arrow = Arrow(LEFT, RIGHT, color=th.COLOR_MUTED).scale(0.8)
+        arrow_label = th.text(f"{cfg.N_STATS:,} simulated rows", th.MIN_SIZE, th.COLOR_MUTED)
+        middle = VGroup(arrow_label, arrow).arrange(DOWN, buff=0.12)
+        maps = VGroup(left, middle, right).arrange(RIGHT, buff=0.5)
+        middle.align_to(left[1], DOWN).shift(0.9 * UP)
+        maps.next_to(title, DOWN, buff=0.35).set_x(0)
+
+        scores = cfg.SYNTH_SCORE_MEAN + cfg.SYNTH_SCORE_SD * rows[: cfg.SYNTH_TABLE_ROWS]
+        table = VGroup(
+            *[th.text(name, th.MIN_SIZE, th.COLOR_MUTED) for name in cfg.SYNTH_VARIABLES],
+            *[th.text(f"{value:.0f}", th.MIN_SIZE) for row in scores for value in row],
+        ).arrange_in_grid(
+            rows=1 + cfg.SYNTH_TABLE_ROWS, cols=len(cfg.SYNTH_VARIABLES), buff=(0.9, 0.14)
+        )
+        table.next_to(maps, DOWN, buff=0.3).set_x(right.get_x())
+        n_cols = len(cfg.SYNTH_VARIABLES)
+        caption = th.caption(
+            "Fake data with real structure: safe to share, useful for testing models."
+        )
+
+        self.play(FadeIn(title), FadeIn(left), run_time=cfg.T_MEDIUM)
+        self.play(GrowArrow(arrow), FadeIn(arrow_label), run_time=cfg.T_SHORT)
+        self.play(FadeIn(right, shift=0.2 * LEFT), run_time=cfg.T_MEDIUM)
+        self.play(FadeIn(table[:n_cols]), run_time=cfg.T_SHORT)
+        self.play(
+            LaggedStart(
+                *[
+                    FadeIn(table[start : start + n_cols], shift=0.15 * DOWN)
+                    for start in range(n_cols, len(table), n_cols)
+                ],
+                lag_ratio=0.5,
+            ),
+            run_time=cfg.T_MEDIUM,
+        )
+        self.play(FadeIn(caption), run_time=cfg.T_SHORT)
+
+    def _heatmap(self, corr: np.ndarray, label: str, fixed: bool) -> VGroup:
+        """A correlation heatmap: label, then a grid of teal cells with their values.
+
+        Rows are named with SYNTH_VARIABLES; columns follow the same order.
+        Returns VGroup(label, grid) where grid holds cells, numbers and row names.
+        """
+        cell = th.HEATMAP_CELL
+        cells, numbers = VGroup(), VGroup()
+        for i, row in enumerate(np.asarray(corr)):
+            for j, value in enumerate(row):
+                square = Square(cell).move_to([j * cell, -i * cell, 0])
+                strength = float(np.clip(value, 0.0, 1.0))
+                square.set_fill(
+                    interpolate_color(
+                        ManimColor(th.COLOR_PANEL), ManimColor(th.COLOR_SIGMA), strength
+                    ),
+                    1.0,
+                )
+                square.set_stroke(th.BACKGROUND, width=3)
+                ink = th.BACKGROUND if strength > 0.55 else th.COLOR_TEXT
+                numbers.add(th.math(fmt(value, fixed=fixed), th.MIN_SIZE, ink).move_to(square))
+                cells.add(square)
+        names = VGroup(
+            *[
+                th.text(name, th.MIN_SIZE, th.COLOR_MUTED).next_to(cells[i * len(corr)], LEFT)
+                for i, name in enumerate(cfg.SYNTH_VARIABLES)
+            ]
+        )
+        grid = VGroup(cells, numbers, names)
+        title = th.text(label, th.CAPTION_SIZE).next_to(cells, UP, buff=0.2)
+        return VGroup(title, grid)
 
     # --- 1.2 -----------------------------------------------------------------
 
     def slide_1_2_what_computers_give(self) -> None:
-        """A round blue N(0, I) cloud. Point: computers give us independent noise."""
+        """Code rows fly to dots of a round cloud. Point: computers give us independent noise."""
         self.begin_slide(
-            notes="""
-            This is what a computer gives us for free. One line of NumPy draws
-            from the 1D standard normal, the familiar bell curve with mean 0 and
-            variance 1. Each row here is two independent draws, so the vector z
-            is N of 0 and I, and that independence is why the cloud is round.
+            notes=f"""
+            Here's what a computer gives us for free. One line of numpy and we
+            get {cfg.N_DISPLAY} rows, and each row is a point. Every draw is independent,
+            and the two columns have nothing to do with each other, so the
+            correlation is zero and the cloud is round. The rest of this talk is
+            about mixing those two columns together.
             """
         )
         title = th.slide_title("What computers give us")
-        half_width = mm.shared_half_width([IDENTITY], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
-        axes = make_square_axes((0.0, 0.0), half_width, th.PANEL_LARGE)
-        cloud = make_point_cloud(self.z_display, axes, th.COLOR_Z)
-
-        # The real call, with the deck's own seed and sample count.
+        shown = self.z_display[: cfg.N_PRINTED_ROWS]
+        printed = [f"[{a:5.2f}, {b:5.2f}]" for a, b in shown]
         code = make_code(
             f"rng = np.random.default_rng({cfg.RANDOM_SEED})\n"
-            f"z = rng.standard_normal(({cfg.N_DISPLAY}, 2))\n"
-            "# each row: two independent N(0, 1) draws"
+            f"Z = rng.standard_normal(({cfg.N_DISPLAY}, 2))"
+            f"  # {cfg.N_DISPLAY} points, 2 variables\n"
+            "\n"
+            f"Z[:{len(shown)}]\n"
+            f"# [{printed[0]},\n"
+            + "".join(f"#  {row},\n" for row in printed[1:-1])
+            + f"#  {printed[-1]}]"
         )
-        code.next_to(title, DOWN, buff=0.4).align_to(title, LEFT)
-        # Each call samples the 1D standard normal; two independent draws form z.
+        code.next_to(title, DOWN, buff=0.35).align_to(title, LEFT)
+        first_row_line = 4  # code line index of the first printed row
+        # Each value comes from the 1D standard normal; say which one, in full.
         one_d = th.math(
-            r"\mathcal{N}(0, 1):\quad \varphi(z) = \frac{1}{\sqrt{2\pi}}\, e^{-z^2/2}",
-            th.BODY_SIZE,
+            r"\text{each value} \sim \mathcal{N}(0, 1):\quad"
+            r" \varphi(z) = \frac{1}{\sqrt{2\pi}}\, e^{-z^2/2}",
+            th.CAPTION_SIZE,
             th.COLOR_Z,
+        ).next_to(code, DOWN, buff=0.35, aligned_edge=LEFT)
+
+        half_width = mm.shared_half_width([IDENTITY], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
+        axes = make_square_axes((0.0, 0.0), half_width, th.PANEL_CODE_CLOUD)
+        axes.to_edge(RIGHT, buff=0.9).set_y(0.35)
+        names = VGroup(
+            th.math("z_1", th.MIN_SIZE, th.COLOR_MUTED).next_to(axes, DOWN, buff=0.08),
+            th.math("z_2", th.MIN_SIZE, th.COLOR_MUTED).next_to(axes, LEFT, buff=0.08),
         )
-        vector = th.math(
-            r"\mathbf{z} = (z_1, z_2) \sim \mathcal{N}(\mathbf{0}, I)", th.BODY_SIZE, th.COLOR_Z
-        )
-        distribution = VGroup(one_d, vector).arrange(DOWN, buff=0.45, aligned_edge=LEFT)
-        distribution.next_to(code, DOWN, buff=0.55).align_to(code, LEFT).shift(0.3 * RIGHT)
-        VGroup(axes, cloud).move_to([3.6, -0.35, 0])
-        caption = th.caption("Independent. No correlation.")
+        plot_label = th.math(
+            r"\mathbf{z} = (z_1, z_2) \sim \mathcal{N}(\mathbf{0}, I)", th.CAPTION_SIZE, th.COLOR_Z
+        ).next_to(axes, UP, buff=0.12)
+        rest = make_point_cloud(self.z_display[len(shown) :], axes, th.COLOR_Z)
+        correlation = mm.sample_corr(self.z_stats)[0, 1]
+        readout = th.math(
+            rf"\text{{Correlation between }} z_1 \text{{ and }} z_2 \approx"
+            rf" {fmt(correlation, fixed=True)}",
+            th.CAPTION_SIZE,
+        ).next_to(names[0], DOWN, buff=0.15)
+        caption = VGroup(
+            th.text("Each draw is independent of the others.", th.CAPTION_SIZE),
+            th.text("The two variables are not correlated.", th.CAPTION_SIZE),
+        ).arrange(DOWN, buff=0.12)
+        caption.move_to([0, th.CAPTION_Y + 0.05, 0])
 
         self.play(FadeIn(title), FadeIn(code, shift=0.2 * DOWN), run_time=cfg.T_MEDIUM)
-        self.play(Create(axes), run_time=cfg.T_SHORT)
-        self.play(fade_in_cloud(cloud))
+        self.play(Create(axes), FadeIn(names), FadeIn(plot_label), run_time=cfg.T_SHORT)
+        # One printed row is one point: fly each row to where it lands.
+        flown = VGroup()
+        for index, point in enumerate(shown):
+            line = code.code_lines[first_row_line + index]
+            box = SurroundingRectangle(line, color=th.COLOR_Z, buff=0.05)
+            dot = Dot(axes.c2p(*point), radius=th.WORKED_DOT_RADIUS, color=th.COLOR_Z)
+            self.play(Create(box), run_time=cfg.T_SHORT / 2)
+            self.play(ReplacementTransform(line.copy(), dot), FadeOut(box), run_time=cfg.T_SHORT)
+            flown.add(dot)
+        regular = make_point_cloud(shown, axes, th.COLOR_Z)
+        self.play(Transform(flown, regular), fade_in_cloud(rest))
         self.play(Write(one_d), run_time=cfg.T_MEDIUM)
-        self.play(Write(vector), run_time=cfg.T_MEDIUM)
+        self.play(FadeIn(readout), run_time=cfg.T_SHORT)
         self.play(FadeIn(caption), run_time=cfg.T_SHORT)
 
     # --- 1.3 -----------------------------------------------------------------
 
     def slide_1_3_what_we_want(self) -> None:
-        """Density, Sigma and the target cloud. Point: Sigma is the blueprint we want."""
+        """Orange tilted cloud, then mu and Sigma annotated. Point: Sigma is the blueprint."""
         self.begin_slide(
             notes="""
             What we actually want is a multivariate normal with a mean vector mu
-            and a covariance matrix Sigma. The diagonal of Sigma holds the
-            variances of each variable, and the off-diagonal entries hold how
-            much they move together. Data drawn from it looks like this tilted
-            orange cloud. How we made it is the rest of the talk.
+            and a covariance matrix Sigma. Mu is the center of the cloud. The
+            diagonal of Sigma holds the variances, how spread out each variable
+            is, and the off-diagonal entry is the covariance, how the two move
+            together. How we made this cloud is the rest of the talk.
             """
         )
         title = th.slide_title("What we want")
-        density = th.math(
-            r"f(\mathbf{x}) = \frac{1}{(2\pi)^{k/2}\, |\Sigma|^{1/2}}"
-            r"\exp\!\left(-\frac{1}{2} (\mathbf{x}-\boldsymbol{\mu})^T"
-            r" \Sigma^{-1} (\mathbf{x}-\boldsymbol{\mu})\right)",
-            substrings_to_isolate=[r"\Sigma", r"\mathbf{x}"],
+        half_width = mm.shared_half_width(
+            [IDENTITY, cfg.MAIN_SIGMA], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP
         )
-        density.set_color_by_tex(r"\Sigma", th.COLOR_SIGMA)
-        density.set_color_by_tex(r"\mathbf{x}", th.COLOR_X)
-        density.next_to(title, DOWN, buff=0.3).set_x(0)
+        target_axes = make_square_axes(cfg.MAIN_MU, half_width, th.PANEL_LARGE)
+        target_axes.move_to([3.5, 0.05, 0])
+        target_cloud = make_point_cloud(
+            mm.transform(self.z_display, cfg.MAIN_MU, self.main_chol), target_axes, th.COLOR_X
+        )
+        target_label = th.math(
+            r"\mathcal{N}(\boldsymbol{\mu}, \Sigma)", th.BODY_SIZE, th.COLOR_X
+        ).next_to(target_axes, DOWN, buff=0.15)
 
-        self.play(FadeIn(title), run_time=cfg.T_SHORT)
-        self.play(Write(density), run_time=cfg.T_LONG)
+        # The blue cloud from 1.2 starts where the target will be, then shrinks away.
+        blue_axes = make_square_axes((0.0, 0.0), half_width, th.PANEL_LARGE).move_to(target_axes)
+        blue = VGroup(blue_axes, make_point_cloud(self.z_display, blue_axes, th.COLOR_Z))
+        thumb_target = blue.copy().scale(th.PANEL_THUMB / th.PANEL_LARGE)
+        thumb_target.next_to(title, DOWN, buff=0.35).align_to(title, LEFT).shift(0.3 * RIGHT)
+        blue_label = th.math(r"\mathcal{N}(\mathbf{0}, I)", th.CAPTION_SIZE, th.COLOR_Z)
+        blue_label.next_to(thumb_target, RIGHT, buff=0.25)
+
+        self.play(FadeIn(title), FadeIn(blue), run_time=cfg.T_MEDIUM)
+        self.play(Transform(blue, thumb_target), FadeIn(blue_label), run_time=cfg.T_MEDIUM)
+        self.play(Create(target_axes), run_time=cfg.T_SHORT)
+        self.play(fade_in_cloud(target_cloud), FadeIn(target_label))
         self.reveal()
 
-        # Symbols rather than numbers: this slide is about what each entry means.
-        sigma_block = VGroup(
-            th.math(r"\Sigma =", color=th.COLOR_SIGMA),
-            make_symbolic_matrix(SIGMA_SYMBOLS, th.COLOR_SIGMA),
-        ).arrange(RIGHT, buff=0.2)
-        mu_block = VGroup(
-            th.math(r"\boldsymbol{\mu} ="),
-            make_symbolic_matrix([[r"\mu_x"], [r"\mu_y"]], th.COLOR_TEXT),
-        ).arrange(RIGHT, buff=0.2)
-        blocks = VGroup(mu_block, sigma_block).arrange(RIGHT, buff=0.8)
+        sigma = np.asarray(cfg.MAIN_SIGMA)
+        mu_block = make_labeled_matrix(
+            r"\boldsymbol{\mu}", [[m] for m in cfg.MAIN_MU], th.COLOR_TEXT
+        )
+        sigma_block = make_labeled_matrix(r"\Sigma", sigma, th.COLOR_SIGMA)
+        blocks = VGroup(mu_block, sigma_block).arrange(RIGHT, buff=0.7)
         notes_text = VGroup(
-            th.text("Diagonal (boxed): variances", th.CAPTION_SIZE),
-            th.text("Off-diagonal (dashed): covariances", th.CAPTION_SIZE),
+            th.text(
+                f"Diagonal {fmt(sigma[0, 0])}, {fmt(sigma[1, 1])}: variances (spread)",
+                th.CAPTION_SIZE,
+            ),
+            th.text(
+                f"Off-diagonal {fmt(sigma[0, 1])}: covariance (moving together)",
+                th.CAPTION_SIZE,
+            ),
         ).arrange(DOWN, buff=0.2, aligned_edge=LEFT)
-        left_column = VGroup(blocks, notes_text).arrange(DOWN, buff=0.6)
-        left_column.move_to([-3.4, -0.75, 0])
+        left_column = VGroup(blocks, notes_text).arrange(DOWN, buff=0.45, aligned_edge=LEFT)
+        left_column.next_to(thumb_target, DOWN, buff=0.55).align_to(title, LEFT)
         # Boxes are drawn after layout so they sit on the entries' final positions.
         entries = sigma_block[1].get_entries()
         diagonal_boxes = VGroup(
@@ -239,142 +509,229 @@ class S1Problem(DeckSlide):
                 for i in (1, 2)
             ]
         )
+        center = Dot(target_axes.c2p(*cfg.MAIN_MU), radius=th.WORKED_DOT_RADIUS)
+        center_label = th.math(r"\boldsymbol{\mu}", th.CAPTION_SIZE)
+        center_label.add_background_rectangle(color=th.BACKGROUND, opacity=0.9, buff=0.04)
+        center_label.next_to(center, UR, buff=0.05)
+        caption = th.caption(
+            "μ says where the cloud sits. Σ says how wide it is and which way it tilts."
+        )
 
-        self.play(FadeIn(mu_block), FadeIn(sigma_block), run_time=cfg.T_MEDIUM)
+        self.play(FadeIn(mu_block), FadeIn(center, scale=2), FadeIn(center_label))
+        self.play(FadeIn(sigma_block), run_time=cfg.T_SHORT)
         self.play(Create(diagonal_boxes), FadeIn(notes_text[0]), run_time=cfg.T_MEDIUM)
         self.play(Create(off_diagonal_boxes), FadeIn(notes_text[1]), run_time=cfg.T_MEDIUM)
-        self.reveal()
-
-        half_width = mm.shared_half_width(
-            [IDENTITY, cfg.MAIN_SIGMA], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP
-        )
-        axes = make_square_axes(cfg.MAIN_MU, half_width, th.PANEL_TARGET)
-        samples = mm.transform(self.z_display, cfg.MAIN_MU, self.main_chol)
-        cloud = make_point_cloud(samples, axes, th.COLOR_X)
-        ellipse = make_cov_ellipse(cfg.MAIN_SIGMA, cfg.MAIN_MU, cfg.QUESTION_ELLIPSE_K, axes)
-        VGroup(axes, cloud, ellipse).move_to([3.6, -0.85, 0])
-
-        self.play(Create(axes), run_time=cfg.T_SHORT)
-        self.play(fade_in_cloud(cloud))
-        self.play(Create(ellipse), run_time=cfg.T_MEDIUM)
+        self.play(FadeIn(caption), run_time=cfg.T_SHORT)
 
     # --- 1.4 -----------------------------------------------------------------
 
-    def slide_1_4_what_each_entry_does(self) -> None:
-        """Change Sigma's entries one at a time. Point: each entry has a visible job."""
+    def slide_1_4_reading_the_formula(self) -> None:
+        """1D formula rearranged into the nD one, term by term, then the distance term."""
         self.begin_slide(
             notes="""
-            Here is what each entry actually does, using the same random points
-            the whole time. Making sigma xx bigger stretches the cloud along x,
-            and making sigma yy smaller squeezes it in y. The covariance sets the
-            tilt: negative tilts it down, and zero lines the ellipse up with the axes.
+            This formula looks scary, but you already know it. Here's the 1D
+            bell curve, and if I rearrange it a little, it has exactly the same
+            shape as the multivariate one. Numbers become vectors, σ² becomes Σ,
+            and dividing becomes multiplying by an inverse. The only genuinely
+            new idea is the distance term: it measures distance in units of
+            spread, so a point along the long axis counts as closer than one the
+            same ruler distance along the short axis.
             """
         )
-        title = th.slide_title("What each entry does")
-        start = np.asarray(cfg.MAIN_SIGMA, dtype=float)
-        steps = [(caption, np.asarray(sigma, dtype=float)) for caption, sigma in cfg.SIGMA_WALK]
-        # One tracker per distinct entry: sigma_yx always equals sigma_xy.
-        var_x, cov_xy, var_y = (
-            ValueTracker(start[0, 0]),
-            ValueTracker(start[0, 1]),
-            ValueTracker(start[1, 1]),
+        title = th.slide_title("Reading the formula: same idea as 1D")
+        size = th.CAPTION_SIZE
+        original = self._colored_formula(FORMULA_1D, [None, "norm", None, "dist", None], size)
+        rearranged = self._colored_formula(FORMULA_1D_REARRANGED, FORMULA_ROLES, size)
+        n_d = self._colored_formula(FORMULA_ND, FORMULA_ROLES, size)
+        self._align_columns(rearranged, n_d)
+        rows = VGroup(rearranged, n_d)
+        rows.next_to(title, DOWN, buff=0.6).set_x(0.5)
+        row_names = VGroup(
+            th.text("1D", th.CAPTION_SIZE, th.COLOR_MUTED).next_to(rearranged, LEFT, buff=0.5),
+            th.text("nD", th.CAPTION_SIZE, th.COLOR_MUTED).next_to(n_d, LEFT, buff=0.5),
+        )
+        row_names.align_to(row_names[0], LEFT)
+        original.move_to(rearranged, aligned_edge=LEFT)
+
+        bell_axes = Axes(
+            x_range=[-3.5, 3.5, 1],
+            y_range=[0, 0.45, 0.45],
+            x_length=th.FORMULA_BELL_WIDTH,
+            y_length=th.FORMULA_BELL_HEIGHT,
+            tips=False,
+            axis_config={"color": th.COLOR_MUTED, "stroke_width": th.AXIS_STROKE},
+            y_axis_config={"include_ticks": False},
+        ).next_to(original, RIGHT, buff=0.8)
+        bell = VGroup(bell_axes, make_bell_curve(bell_axes, 0.0, 1.0, th.COLOR_Z))
+
+        self.play(FadeIn(title), FadeIn(row_names[0]), run_time=cfg.T_SHORT)
+        self.play(Write(original), FadeIn(bell), run_time=cfg.T_MEDIUM)
+        self.reveal()
+
+        caption = th.caption("Same formula, just rearranged.")
+        self.play(FadeOut(bell), run_time=cfg.T_SHORT)
+        self.play(TransformMatchingTex(original, rearranged), run_time=cfg.T_LONG)
+        self.play(FadeIn(caption), run_time=cfg.T_SHORT)
+        self.reveal()
+
+        self.play(FadeIn(row_names[1]), FadeOut(caption), run_time=cfg.T_SHORT)
+        self.play(
+            LaggedStart(
+                *[TransformFromCopy(top, bottom) for top, bottom in zip(rearranged, n_d)],
+                lag_ratio=0.15,
+            ),
+            run_time=cfg.T_LONG,
         )
 
-        def current_sigma() -> np.ndarray:
-            return np.array(
-                [[var_x.get_value(), cov_xy.get_value()], [cov_xy.get_value(), var_y.get_value()]]
-            )
-
-        half_width = mm.shared_half_width(
-            [start] + [sigma for _, sigma in steps], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP
-        )
-        axes = make_square_axes(cfg.MAIN_MU, half_width, th.PANEL_TARGET).move_to([3.7, -0.3, 0])
-        # Redrawn every frame from the same z, so the only change is Sigma.
-        cloud = always_redraw(
-            lambda: make_point_cloud(
-                mm.transform(self.z_display, cfg.MAIN_MU, mm.cholesky_factor(current_sigma())),
-                axes,
-                th.COLOR_X,
-            )
-        )
-        ellipse = always_redraw(
-            lambda: make_cov_ellipse(current_sigma(), cfg.MAIN_MU, cfg.QUESTION_ELLIPSE_K, axes)
-        )
-
-        symbols = make_symbolic_matrix(SIGMA_SYMBOLS, th.COLOR_SIGMA)
-        values = self._live_sigma_matrix(current_sigma)
-        sigma_row = VGroup(
-            th.math(r"\Sigma =", color=th.COLOR_SIGMA), symbols, th.math("="), values
-        ).arrange(RIGHT, buff=0.25)
-        sigma_row.move_to([-3.4, 0.2, 0])
-
-        self.play(FadeIn(title), Create(axes), FadeIn(sigma_row), run_time=cfg.T_SHORT)
-        self.add(cloud, ellipse)
-        self.play(FadeIn(cloud), FadeIn(ellipse), run_time=cfg.T_SHORT)
-
-        previous, boxes, caption = start, VGroup(), VGroup()
-        for text, target in steps:
+        table = self._translation_table().next_to(rows, DOWN, buff=0.45).set_x(0)
+        header, *table_rows = table
+        for index, row in enumerate(table_rows):
             self.reveal()
-            changed = [k for k, (i, j) in enumerate(ENTRY_INDEX) if target[i, j] != previous[i, j]]
-            new_boxes = VGroup(
-                *[
-                    SurroundingRectangle(symbols.get_entries()[k], color=th.COLOR_TEXT)
-                    for k in changed
-                ],
-                *[self._value_box(values.get_entries()[k]) for k in changed],
-            )
-            new_caption = th.caption(text)
-            self.play(
-                FadeOut(boxes),
-                FadeOut(caption),
-                Create(new_boxes),
-                FadeIn(new_caption),
-                run_time=cfg.T_SHORT,
-            )
-            self.play(
-                var_x.animate.set_value(target[0, 0]),
-                cov_xy.animate.set_value(target[0, 1]),
-                var_y.animate.set_value(target[1, 1]),
-                run_time=cfg.SIGMA_WALK_SECONDS,
-            )
-            # Not a frozen frame: rerun the updaters so the readout shows the exact target.
-            self.wait(cfg.T_SETTLE, frozen_frame=False)
-            previous, boxes, caption = target, new_boxes, new_caption
+            if index == 0:
+                self.play(FadeIn(header), run_time=cfg.T_SHORT)
+            self.play(FadeIn(row, shift=0.15 * DOWN), run_time=cfg.T_SHORT)
+        self.reveal()
 
-        # Freeze the live pieces so the next slide's fade-out applies to them.
-        for mobject in (cloud, ellipse, *values.get_entries()):
-            mobject.clear_updaters()
+        # Distance term: drop the 1D row and the table, keep the nD formula on top.
+        self.play(FadeOut(table), FadeOut(rearranged), FadeOut(row_names), run_time=cfg.T_SHORT)
+        self.play(n_d.animate.next_to(title, DOWN, buff=0.4).set_x(0), run_time=cfg.T_SHORT)
+        distance_box = SurroundingRectangle(n_d[4:8], color=th.COLOR_DIST, buff=0.08)
+        self._distance_points(distance_box)
 
-    def _live_sigma_matrix(self, current_sigma) -> DecimalMatrix:
-        """Numeric Sigma whose entries follow ``current_sigma()`` every frame."""
-        matrix = DecimalMatrix(
-            current_sigma(),
-            element_to_mobject_config={
-                "num_decimal_places": cfg.SIGMA_WALK_DECIMALS,
-                "font_size": th.BODY_SIZE * th.MATH_SCALE,
-            },
-            h_buff=1.5,
-            v_buff=0.7,
-            element_alignment_corner=ORIGIN,
-        ).set_color(th.COLOR_SIGMA)
-        for entry, (i, j) in zip(matrix.get_entries(), ENTRY_INDEX, strict=True):
-            entry.add_updater(lambda m, i=i, j=j: self._set_centered(m, current_sigma()[i, j]))
-        return matrix
+    def _distance_points(self, distance_box: Mobject) -> None:
+        """Points A and B, the same ruler distance from mu, with different Sigma distance."""
+        mu = np.asarray(cfg.MAIN_MU)
+        half_width = mm.shared_half_width([cfg.MAIN_SIGMA], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
+        axes = make_square_axes(mu, half_width, th.PANEL_FORMULA)
+        axes.next_to(distance_box, DOWN, buff=0.3).set_x(-3.0)
+        cloud = make_point_cloud(
+            mm.transform(self.z_display, mu, self.main_chol), axes, th.COLOR_X
+        ).set_opacity(0.35)
+        _, vectors = mm.eigen_axes(cfg.MAIN_SIGMA)
+        distance = cfg.FORMULA_POINT_DISTANCE
+        points = [mu + distance * vectors[:, 0], mu + distance * vectors[:, 1]]
+        squared = [mm.mahalanobis_sq(p, mu, cfg.MAIN_SIGMA) for p in points]
+
+        ruler = DashedVMobject(
+            Circle(radius=distance * axes.x_axis.get_unit_size(), color=th.COLOR_TEXT)
+        ).move_to(axes.c2p(*mu))
+        center = Dot(axes.c2p(*mu), radius=0.06, color=th.COLOR_TEXT)
+        markers, spokes = VGroup(), VGroup()
+        for name, point, direction in zip("AB", points, (UR, UL), strict=True):
+            dot = Dot(axes.c2p(*point), radius=th.WORKED_DOT_RADIUS, color=th.COLOR_DIST)
+            label = th.math(name, th.CAPTION_SIZE, th.COLOR_DIST)
+            label.add_background_rectangle(color=th.BACKGROUND, opacity=0.9, buff=0.04)
+            markers.add(VGroup(dot, label.next_to(dot, direction, buff=0.08)))
+            spokes.add(Line(center.get_center(), dot.get_center(), color=th.COLOR_TEXT))
+
+        size = th.CAPTION_SIZE
+        readout = VGroup(
+            VectorizedPoint(),
+            th.text("ruler", size, th.COLOR_MUTED),
+            th.math(r"\text{distance}^2", size, th.COLOR_DIST),
+            th.text("A (long axis)", size, th.COLOR_DIST),
+            th.math(fmt(distance), size),
+            th.math(fmt(squared[0]), size, th.COLOR_DIST),
+            th.text("B (short axis)", size, th.COLOR_DIST),
+            th.math(fmt(distance), size),
+            th.math(fmt(squared[1]), size, th.COLOR_DIST),
+        ).arrange_in_grid(rows=3, cols=3, buff=(0.6, 0.3), col_alignments="lcc")
+        readout.next_to(axes, RIGHT, buff=0.8).set_y(axes.get_y() + 0.6)
+        contours = VGroup(
+            *[
+                DashedVMobject(
+                    make_cov_ellipse(cfg.MAIN_SIGMA, mu, np.sqrt(d), axes, th.COLOR_DIST)
+                )
+                for d in squared
+            ]
+        )
+        caption = th.caption(
+            "Same ruler distance, different 'Σ distance'."
+            " Along the long axis, points are more typical."
+        )
+
+        self.play(Create(distance_box), run_time=cfg.T_SHORT)
+        self.play(Create(axes), fade_in_cloud(cloud), run_time=cfg.T_MEDIUM)
+        self.play(FadeIn(center), Create(ruler), run_time=cfg.T_SHORT)
+        self.play(
+            *[Create(s) for s in spokes],
+            *[FadeIn(m, scale=1.5) for m in markers],
+            run_time=cfg.T_MEDIUM,
+        )
+        self.play(FadeIn(readout), FadeIn(caption), run_time=cfg.T_MEDIUM)
+        self.reveal()
+
+        contour_caption = th.caption(
+            "Every point on one ellipse has the same distance, so the same density."
+        )
+        self.play(Create(contours), FadeOut(ruler), FadeTransform(caption, contour_caption))
+        self.reveal()
+
+        final = th.caption(
+            "Only two things change: numbers become vectors and matrices,"
+            " and distance now accounts for tilt."
+        )
+        self.play(FadeTransform(contour_caption, final), run_time=cfg.T_SHORT)
 
     @staticmethod
-    def _set_centered(number: DecimalNumber, value: float) -> None:
-        """Update a DecimalNumber but keep it centered, so a new minus sign
-        does not push it sideways out of its column."""
-        center = number.get_center()
-        number.set_value(value)
-        number.move_to(center)
+    def _colored_formula(parts: list[str], roles: list[str | None], size: float) -> MathTex:
+        """A multi-part MathTex with each piece colored by its role in the density."""
+        formula = MathTex(*parts, font_size=size * th.MATH_SCALE, color=th.COLOR_TEXT)
+        for piece, role in zip(formula, roles, strict=True):
+            if role:
+                piece.set_color(ROLE_COLORS[role])
+        return formula
 
-    def _value_box(self, entry: DecimalNumber) -> SurroundingRectangle:
-        """A highlight box sized for the widest readout ("-9.9"), so it fits every value."""
-        widest = DecimalNumber(
-            -9.9, num_decimal_places=cfg.SIGMA_WALK_DECIMALS, font_size=th.BODY_SIZE * th.MATH_SCALE
-        ).move_to(entry)
-        return SurroundingRectangle(widest, color=th.COLOR_TEXT)
+    @staticmethod
+    def _align_columns(top: MathTex, bottom: MathTex, gap: float = 0.14) -> None:
+        """Place matching pieces of two formulas in shared columns, centered in each."""
+        widths = [max(a.width, b.width) for a, b in zip(top, bottom, strict=True)]
+        x = 0.0
+        for a, b, width in zip(top, bottom, widths, strict=True):
+            a.set_x(x + width / 2)
+            b.set_x(x + width / 2)
+            x += width + gap
+        bottom.next_to(top, DOWN, buff=0.45, coor_mask=UP)
+
+    @staticmethod
+    def _translation_table() -> VGroup:
+        """Header plus four rows (center, spread, distance, normalizer), one VGroup per row."""
+        size = th.CAPTION_SIZE
+        cells = [
+            ("Piece", "1D", "nD", "What it means"),
+            ("Center", r"\mu", r"\boldsymbol{\mu}", "Where the peak is"),
+            ("Spread", r"\sigma^2", r"\Sigma", "How wide, and in nD which way it tilts"),
+            (
+                "Distance",
+                r"\frac{(x-\mu)^2}{\sigma^2}",
+                r"(\mathbf{x}-\boldsymbol{\mu})^T\Sigma^{-1}(\mathbf{x}-\boldsymbol{\mu})",
+                "How many sds from the center, squared",
+            ),
+            (
+                "Normalizer",
+                r"\frac{1}{\sqrt{2\pi\sigma^2}}",
+                r"(2\pi)^{-k/2}|\Sigma|^{-1/2}",
+                "Makes the total probability 1",
+            ),
+        ]
+        colors = [th.COLOR_MUTED, th.COLOR_TEXT, th.COLOR_SIGMA, th.COLOR_DIST, th.COLOR_NORM]
+        mobjects = []
+        for index, (piece, one_d, n_d, meaning) in enumerate(cells):
+            color = colors[index]
+            if index == 0:
+                row = [th.text(t, size, color) for t in (piece, one_d, n_d, meaning)]
+            else:
+                row = [
+                    th.text(piece, size, color),
+                    th.math(one_d, th.MIN_SIZE, color),
+                    th.math(n_d, th.MIN_SIZE, color),
+                    th.text(meaning, th.MIN_SIZE),
+                ]
+            mobjects.extend(row)
+        grid = VGroup(*mobjects).arrange_in_grid(
+            rows=len(cells), cols=4, buff=(0.45, 0.16), col_alignments="lccl"
+        )
+        return VGroup(*[VGroup(*grid[i * 4 : i * 4 + 4]) for i in range(len(cells))])
 
     # --- 1.5 -----------------------------------------------------------------
 
@@ -383,9 +740,9 @@ class S1Problem(DeckSlide):
         self.begin_slide(
             notes="""
             So here is the whole problem in one picture. On the left is the
-            round cloud we can generate, and on the right is the tilted cloud we
-            want. Both plots use the same scale. So the question is: how do we
-            change the distribution of the points to get from the left to the right?
+            round cloud a computer gives us, and on the right is the tilted cloud
+            we want, drawn to the same scale. The question for the rest of the
+            talk is how to turn one into the other.
             """
         )
         title = th.slide_title("The question")
@@ -410,7 +767,7 @@ class S1Problem(DeckSlide):
         question = th.text("?", th.QUESTION_SIZE)
         middle = VGroup(question, arrow).arrange(DOWN, buff=0.2)
         VGroup(left, middle, right).arrange(RIGHT, buff=0.7).move_to(0.2 * DOWN)
-        caption = th.caption("How do we change the distribution of the points?")
+        caption = th.caption("How do we turn N(0, I) into N(μ, Σ)?")
 
         self.play(FadeIn(title), Create(left_axes), Create(right_axes), run_time=cfg.T_SHORT)
         self.play(fade_in_cloud(left_cloud), FadeIn(left_label))
@@ -421,201 +778,283 @@ class S1Problem(DeckSlide):
     # --- 1.6 -----------------------------------------------------------------
 
     def slide_1_6_one_d_warmup(self) -> None:
-        """Stretch then shift a bell curve. Point: in 1D we scale by sigma, then shift by mu."""
+        """N(0, 1) to N(3, 4): scale by sqrt(variance), not the variance. Point: the 1D rule."""
         self.begin_slide(
-            notes="""
-            Let's warm up in one dimension, where we already know the answer.
-            Take z from N of 0 and 1, stretch it by the standard deviation, then
-            shift it by the mean; watch the mean line and the sigma markers move.
-            The result is exactly N of 3 and 4.
+            notes=f"""
+            Let's start with something we already know. We want a normal with
+            mean {cfg.ONE_D_MU:g} and variance {cfg.ONE_D_VARIANCE:g}. The obvious
+            move is to multiply by {cfg.ONE_D_NAIVE_SCALE:g}, but the curve
+            overshoots and the variance jumps to {cfg.ONE_D_NAIVE_SCALE**2:g},
+            because stretching by a multiplies the variance by a squared. So we
+            stretch by the square root of {cfg.ONE_D_VARIANCE:g}, which is
+            {cfg.ONE_D_VARIANCE**0.5:g}, then shift by {cfg.ONE_D_MU:g}. To get
+            variance sigma squared, you scale by its square root.
             """
         )
-        mu, sd = cfg.ONE_D_MU, cfg.ONE_D_SIGMA
+        mu, var, naive = cfg.ONE_D_MU, cfg.ONE_D_VARIANCE, cfg.ONE_D_NAIVE_SCALE
+        sd = float(np.sqrt(var))
         title = th.slide_title("Warm-up: we already do this in 1D")
-        axes = self._one_d_axes()
-        peak = float(mm.normal_pdf_1d(0.0, 0.0, 1.0))
-
-        curve = make_bell_curve(axes, 0.0, 1.0, th.COLOR_Z)
-        curve_label = th.math(r"z \sim \mathcal{N}(0, 1)", th.BODY_SIZE, th.COLOR_Z)
-        curve_label.next_to(axes.c2p(-0.5, peak), LEFT, buff=0.3)  # leaves room for the mu label
-        guides = make_mean_sd_guides(axes, 0.0, 1.0)
-
-        steps = VGroup(
-            th.math(rf"\text{{1. Stretch by }} \sigma = {fmt(sd)}"),
-            th.math(rf"\text{{2. Shift by }} \mu = {fmt(mu)}"),
-        ).arrange(DOWN, buff=0.3, aligned_edge=LEFT)
-        results = VGroup(
-            th.math(rf"{fmt(sd)}z \sim \mathcal{{N}}(0, {fmt(sd**2)})", color=th.COLOR_Z),
-            th.math(
-                rf"x = {fmt(mu)} + {fmt(sd)}z \sim \mathcal{{N}}({fmt(mu)}, {fmt(sd**2)})",
-                color=th.COLOR_X,
-            ),
-        )
-        steps.next_to(title, DOWN, buff=0.4).set_x(-6.4, direction=LEFT)
-        for step, result in zip(steps, results, strict=True):
-            result.move_to(step, coor_mask=UP).set_x(0.6, direction=LEFT)
-
-        self.play(FadeIn(title), Create(axes), run_time=cfg.T_SHORT)
-        self.play(Create(curve), FadeIn(curve_label), run_time=cfg.T_MEDIUM)
-        self.play(Create(guides), run_time=cfg.T_MEDIUM)
-        self.reveal()
-
-        stretched = make_bell_curve(axes, 0.0, sd, th.COLOR_Z)
-        self.play(FadeIn(steps[0]), FadeOut(curve_label), run_time=cfg.T_SHORT)
-        self.play(
-            Transform(curve, stretched),
-            Transform(guides, make_mean_sd_guides(axes, 0.0, sd)),
-            FadeIn(results[0]),
-            run_time=cfg.T_LONG,
-        )
-        self.reveal()
-
-        shifted = make_bell_curve(axes, mu, sd, th.COLOR_X)
-        self.play(FadeIn(steps[1]), run_time=cfg.T_SHORT)
-        self.play(
-            Transform(curve, shifted),
-            Transform(guides, make_mean_sd_guides(axes, mu, sd)),
-            FadeIn(results[1]),
-            run_time=cfg.T_LONG,
-        )
-
-    def _one_d_axes(self, center_y: float = -0.95) -> Axes:
-        """Bell-curve axes shared by slides 1.6 and 1.7, so the trap is drawn to the same scale."""
-        x_lim = mm.axis_limits_1d(
-            [0.0, cfg.ONE_D_MU], [1.0, cfg.ONE_D_SIGMA], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP
-        )
+        x_lim = mm.axis_limits_1d([0.0, mu], [naive, sd], cfg.ONE_D_AXIS_N_SD, cfg.AXIS_ROUND_STEP)
         peak = float(mm.normal_pdf_1d(0.0, 0.0, 1.0))
         axes = make_density_axes(x_lim, 1.15 * peak, th.DENSITY_WIDTH, th.DENSITY_HEIGHT)
-        return axes.move_to([0, center_y, 0])
+        axes.move_to([0, -0.95, 0])
+
+        scale, shift, warmth = ValueTracker(1.0), ValueTracker(0.0), ValueTracker(0.0)
+        curve = always_redraw(
+            lambda: make_bell_curve(
+                axes,
+                shift.get_value(),
+                scale.get_value(),
+                interpolate_color(
+                    ManimColor(th.COLOR_Z), ManimColor(th.COLOR_X), warmth.get_value()
+                ),
+            )
+        )
+        target = DashedVMobject(make_bell_curve(axes, mu, sd, th.COLOR_TEXT), num_dashes=50)
+        target.set_stroke(opacity=0.6)
+        target_label = th.text("target", th.MIN_SIZE, th.COLOR_MUTED)
+        target_label.next_to(axes.c2p(mu + sd, float(mm.normal_pdf_1d(mu + sd, mu, sd))), UR)
+        guides = self._live_guides(axes, scale, shift)
+
+        goal = MathTex(
+            r"\text{Goal: }\mathcal{N}(",
+            fmt(mu),
+            ",",
+            fmt(var),
+            ")",
+            font_size=th.BODY_SIZE * th.MATH_SCALE,
+        )
+        goal_box = SurroundingRectangle(goal[3], color=th.COLOR_SIGMA, buff=0.07)
+        goal_note = th.text("variance", th.MIN_SIZE, th.COLOR_SIGMA)
+        equation = th.math(r"x = \,?\cdot z + \,?")
+        top_left = VGroup(goal, equation).arrange(DOWN, buff=0.45, aligned_edge=LEFT)
+        top_left.next_to(title, DOWN, buff=0.4).set_x(-6.2, direction=LEFT)
+        goal_box.move_to(goal[3])
+        goal_note.next_to(goal_box, RIGHT, buff=0.15)
+
+        readout, variance_value = self._variance_readout(scale)
+        readout.next_to(title, DOWN, buff=0.45).to_edge(RIGHT, buff=th.EDGE_BUFF + 0.4)
+
+        self.play(FadeIn(title), Create(axes), run_time=cfg.T_SHORT)
+        self.add(curve)
+        self.play(Create(target), FadeIn(target_label), FadeIn(curve), run_time=cfg.T_MEDIUM)
+        self.add(guides)
+        self.play(FadeIn(guides), FadeIn(readout), run_time=cfg.T_SHORT)
+        self.play(Write(goal), run_time=cfg.T_MEDIUM)
+        self.play(Create(goal_box), FadeIn(goal_note), FadeIn(equation), run_time=cfg.T_SHORT)
+        self.reveal()
+
+        # Attempt: multiply by the variance.
+        naive_equation = th.math(rf"x = {fmt(naive)}z", color=th.COLOR_BAD)
+        naive_equation.move_to(equation, aligned_edge=LEFT)
+        cross = make_cross_mark(0.35).next_to(naive_equation, RIGHT, buff=0.35)
+        caption = th.caption(f"The variance is {fmt(var)}, so multiply by {fmt(naive)}?")
+        self.play(Transform(equation, naive_equation), FadeIn(caption), run_time=cfg.T_SHORT)
+        self.play(scale.animate.set_value(naive), run_time=cfg.T_LONG)
+        self.wait(cfg.T_SETTLE, frozen_frame=False)
+        self.play(variance_value.animate.set_color(th.COLOR_BAD), Create(cross))
+        self.reveal()
+
+        why = th.math(r"\mathrm{Var}(a z) = a^2\, \mathrm{Var}(z)")
+        why.next_to(top_left, DOWN, buff=0.35, aligned_edge=LEFT)
+        why_caption = th.caption("Stretching by a multiplies the variance by a².")
+        self.play(Write(why), FadeTransform(caption, why_caption), run_time=cfg.T_MEDIUM)
+        self.reveal()
+
+        # The fix: scale by the square root of the variance.
+        fixed = th.math(rf"x = {fmt(sd)}z").move_to(equation, aligned_edge=LEFT)
+        check = make_check_mark(0.35).move_to(cross)
+        fix_caption = th.caption(f"Scale by √{fmt(var)} = {fmt(sd)} instead.")
+        self.play(
+            Transform(equation, fixed),
+            FadeOut(cross),
+            FadeTransform(why_caption, fix_caption),
+            run_time=cfg.T_SHORT,
+        )
+        self.play(scale.animate.set_value(sd), run_time=cfg.T_LONG)
+        self.wait(cfg.T_SETTLE, frozen_frame=False)
+        self.play(variance_value.animate.set_color(th.COLOR_GOOD), Create(check))
+        self.reveal()
+
+        shifted = th.math(rf"x = {fmt(mu)} + {fmt(sd)}z", color=th.COLOR_X)
+        shifted.move_to(equation, aligned_edge=LEFT)
+        shift_caption = th.caption(f"Then shift by {fmt(mu)}: the curve lands on the target.")
+        self.play(
+            Transform(equation, shifted),
+            check.animate.next_to(shifted, RIGHT, buff=0.35),
+            FadeTransform(fix_caption, shift_caption),
+            run_time=cfg.T_SHORT,
+        )
+        self.play(shift.animate.set_value(mu), warmth.animate.set_value(1.0), run_time=cfg.T_LONG)
+        self.wait(cfg.T_SETTLE, frozen_frame=False)
+        self.reveal()
+
+        rule = th.math(
+            r"x = \mu + \sqrt{\sigma^2}\, z \sim \mathcal{N}(\mu, \sigma^2)", color=th.COLOR_X
+        ).move_to(why, aligned_edge=LEFT)
+        self.play(FadeOut(shift_caption), FadeTransform(why, rule), run_time=cfg.T_MEDIUM)
+        self.reveal()
+
+        # Freeze the live pieces so the overlay and the next fade-out apply to them.
+        for mobject in (curve, *guides):
+            mobject.clear_updaters()
+        takeaway = th.math(
+            r"\text{To get variance } \sigma^2, \text{ scale by } \sqrt{\sigma^2}.",
+            th.TITLE_SIZE,
+        )
+        self.play(FadeIn(make_dim_overlay()), run_time=cfg.T_SHORT)
+        self.play(Write(takeaway), run_time=cfg.T_MEDIUM)
+
+    @staticmethod
+    def _live_guides(axes: Axes, scale: ValueTracker, shift: ValueTracker) -> VGroup:
+        """Mean line and one-sd arrow that follow the live curve.
+
+        The lines are rebuilt every frame (cheap); the mu and sigma labels are
+        built once and only moved, since rebuilding LaTeX every frame is slow.
+        """
+
+        def lines() -> VGroup:
+            mean, spread = shift.get_value(), scale.get_value()
+            top = float(mm.normal_pdf_1d(mean, mean, spread))
+            at_sd = float(mm.normal_pdf_1d(mean + spread, mean, spread))
+            return VGroup(
+                DashedLine(axes.c2p(mean, 0), axes.c2p(mean, top), color=th.COLOR_TEXT),
+                DoubleArrow(
+                    axes.c2p(mean, at_sd),
+                    axes.c2p(mean + spread, at_sd),
+                    buff=0,
+                    color=th.COLOR_TEXT,
+                    stroke_width=3,
+                    tip_length=0.12,
+                ),
+            )
+
+        guides = always_redraw(lines)
+        mu_label = th.math(r"\mu", th.MIN_SIZE)
+        sd_label = th.math(r"\sigma", th.MIN_SIZE)
+        for label in (mu_label, sd_label):
+            label.add_background_rectangle(color=th.BACKGROUND, opacity=0.9, buff=0.03)
+        mu_label.add_updater(lambda m: m.next_to(guides[0].get_end(), UR, buff=0.06))
+        sd_label.add_updater(lambda m: m.next_to(guides[1], DOWN, buff=0.08))
+        return VGroup(guides, mu_label, sd_label)
+
+    @staticmethod
+    def _variance_readout(scale: ValueTracker) -> tuple[VGroup, DecimalNumber]:
+        """Live 'scale a = ...' and 'variance = a^2 = ...' rows."""
+        size = th.BODY_SIZE * th.MATH_SCALE
+        a_value = DecimalNumber(scale.get_value(), num_decimal_places=2, font_size=size)
+        a_value.add_updater(lambda m: m.set_value(scale.get_value()))
+        variance = DecimalNumber(scale.get_value() ** 2, num_decimal_places=2, font_size=size)
+        variance.add_updater(lambda m: m.set_value(scale.get_value() ** 2))
+        rows = VGroup(
+            VGroup(th.math("a ="), a_value).arrange(RIGHT, buff=0.2),
+            VGroup(th.math(r"\text{variance} = a^2 ="), variance).arrange(RIGHT, buff=0.2),
+        ).arrange(DOWN, buff=0.3, aligned_edge=RIGHT)
+        return rows, variance
 
     # --- 1.7 -----------------------------------------------------------------
 
-    def slide_1_7_the_trap(self) -> None:
-        """Scale by the variance instead of sigma. Point: scale by sqrt(variance)."""
+    def slide_1_7_nd_catch(self) -> None:
+        """The variance becomes a matrix; two naive square roots fail. Point: need a new idea."""
         self.begin_slide(
             notes="""
-            Here is the trap. If we scale by the variance, 4, instead of the
-            standard deviation, 2, the spread doubles and the variance becomes 16,
-            four times too big. So the rule is: scale by the square root of the
-            variance. Remember this, because in more dimensions we will need the
-            square root of a matrix.
+            Now go up a dimension. The variance is no longer one number, it's a
+            whole matrix. If we make the same mistake as before and multiply by
+            Σ, we get Σ squared. And taking the square root of each entry fails
+            too. So what does the square root of a matrix even mean?
             """
         )
-        mu, sd = cfg.ONE_D_MU, cfg.ONE_D_SIGMA
-        var = sd**2
-        title = th.slide_title("The trap: scaling by the variance")
-        axes = self._one_d_axes(center_y=-0.55)  # higher, to leave room for the rule box
-        right_curve = make_bell_curve(axes, mu, sd, th.COLOR_X)
-        right_guides = make_mean_sd_guides(axes, mu, sd)
-        trap_curve = DashedVMobject(make_bell_curve(axes, mu, var, th.COLOR_BAD), num_dashes=60)
-        trap_guides = make_mean_sd_guides(axes, mu, var, th.COLOR_BAD, show_mean=False)
-
-        rows = VGroup(
-            th.math(rf"\text{{Scale by }} \sigma = \sqrt{{{fmt(var)}}} = {fmt(sd)}"),
-            th.math(rf"\text{{Scale by }} \sigma^2 = {fmt(var)}", color=th.COLOR_BAD),
-        ).arrange(DOWN, buff=0.3, aligned_edge=LEFT)
-        results = VGroup(
-            th.math(
-                rf"{fmt(mu)} + {fmt(sd)}z \sim \mathcal{{N}}({fmt(mu)}, {fmt(var)})",
-                color=th.COLOR_X,
-            ),
-            th.math(
-                rf"{fmt(mu)} + {fmt(var)}z \sim \mathcal{{N}}({fmt(mu)}, {fmt(var**2)})",
-                color=th.COLOR_BAD,
-            ),
+        title = th.slide_title("The nD catch: the variance becomes a matrix")
+        var = cfg.ONE_D_VARIANCE
+        question = th.math("???", color=th.COLOR_BAD)
+        one_d = [
+            th.text("1D", th.BODY_SIZE, th.COLOR_MUTED),
+            th.math(rf"\text{{variance}} = {fmt(var)}"),
+            th.text("(one number)", th.CAPTION_SIZE, th.COLOR_MUTED),
+            Arrow(LEFT, RIGHT, color=th.COLOR_MUTED).scale(0.5),
+            th.math(rf"\text{{scale by }} \sqrt{{{fmt(var)}}} = {fmt(np.sqrt(var))}"),
+            make_check_mark(0.35),
+        ]
+        n_d = [
+            th.text("nD", th.BODY_SIZE, th.COLOR_MUTED),
+            VGroup(
+                th.math(r"\text{covariance } \Sigma =", color=th.COLOR_SIGMA),
+                make_matrix(cfg.MAIN_SIGMA, th.COLOR_SIGMA),
+            ).arrange(RIGHT, buff=0.2),
+            th.text("(a matrix)", th.CAPTION_SIZE, th.COLOR_MUTED),
+            Arrow(LEFT, RIGHT, color=th.COLOR_MUTED).scale(0.5),
+            VGroup(th.math(r"\text{scale by } \sqrt{\Sigma} ="), question).arrange(RIGHT, buff=0.2),
+            VectorizedPoint(),  # keeps the grid rectangular; the nD row has no mark yet
+        ]
+        bridge = VGroup(*one_d, *n_d).arrange_in_grid(
+            rows=2, cols=6, buff=(0.35, 0.8), col_alignments="llllll"
         )
-        rows.next_to(title, DOWN, buff=0.4).set_x(-5.8, direction=LEFT)
-        for row, result in zip(rows, results, strict=True):
-            result.move_to(row, coor_mask=UP).set_x(0.6, direction=LEFT)
-        check = make_check_mark(0.35).next_to(rows[0], LEFT, buff=0.2)
-        cross = make_cross_mark(0.3).next_to(rows[1], LEFT, buff=0.2)
+        one_d, n_d = VGroup(*bridge[:6]), VGroup(*bridge[6:])
+        bridge.move_to(0.3 * UP)
+        caption = th.caption("In nD, the variance is a whole matrix. What is its square root?")
 
-        rule = VGroup(
-            th.text("Scale by the square root of the variance", th.BODY_SIZE),
-            th.math(r"x = \mu + \sqrt{\sigma^2}\, z = \mu + \sigma z", th.BODY_SIZE, th.COLOR_X),
-        ).arrange(RIGHT, buff=0.6)
-        rule_box = boxed(rule, color=th.COLOR_GOOD, buff=0.2).move_to([0, -3.0, 0])
-
-        self.play(FadeIn(title), Create(axes), run_time=cfg.T_SHORT)
-        self.play(
-            Create(right_curve),
-            FadeIn(right_guides),
-            FadeIn(rows[0]),
-            FadeIn(results[0]),
-            Create(check),
-            run_time=cfg.T_MEDIUM,
-        )
+        self.play(FadeIn(title), run_time=cfg.T_SHORT)
+        self.play(FadeIn(one_d, lag_ratio=0.15), run_time=cfg.T_MEDIUM)
+        self.play(FadeIn(n_d, lag_ratio=0.15), run_time=cfg.T_MEDIUM)
+        self.play(FadeIn(caption), run_time=cfg.T_SHORT)
+        for _ in range(2):  # pulse the unknown
+            self.play(question.animate(rate_func=there_and_back).scale(1.35), run_time=cfg.T_SHORT)
         self.reveal()
 
-        self.play(FadeIn(rows[1]), FadeIn(results[1]), run_time=cfg.T_SHORT)
-        self.play(Create(trap_curve), FadeIn(trap_guides), run_time=cfg.T_LONG)
-        self.play(Create(cross), run_time=cfg.T_SHORT)
-        self.reveal()
-
-        self.play(FadeIn(rule_box, scale=1.05), run_time=cfg.T_MEDIUM)
-
-    # --- 1.8 -----------------------------------------------------------------
-
-    def slide_1_8_matrix_square_root(self) -> None:
-        """Two naive matrix 'square roots', measured. Point: element-wise thinking fails."""
-        self.begin_slide(
-            notes="""
-            In more than one dimension, what is the square root of a matrix?
-            Let's just try things and measure. Taking the square root of each
-            entry gives a cloud that is too thin and the wrong covariance.
-            Multiplying by Sigma itself overshoots badly, so we need a better idea.
-            """
-        )
-        title = th.slide_title("What is the square root of a matrix?")
         target = VGroup(
             th.text("Target:", th.CAPTION_SIZE, th.COLOR_SIGMA),
             make_labeled_matrix(r"\Sigma", cfg.MAIN_SIGMA, th.COLOR_SIGMA, th.CAPTION_SIZE),
         ).arrange(RIGHT, buff=0.3)
         target.next_to(title, DOWN, buff=0.15).set_x(-6.4, direction=LEFT)
-
-        root = mm.elementwise_sqrt(cfg.MAIN_SIGMA)
-        root_tex = [[sqrt_tex(v) for v in row] for row in cfg.MAIN_SIGMA]
         attempt_one = self._attempt_row(
-            "Attempt 1: element-wise root",
+            "Attempt 1: multiply by Σ",
+            make_labeled_matrix(r"\Sigma", cfg.MAIN_SIGMA, th.COLOR_SIGMA, th.CAPTION_SIZE),
+            np.asarray(cfg.MAIN_SIGMA),
+            th.math(r"\approx \Sigma^2", th.CAPTION_SIZE, th.COLOR_SIGMA),
+        )
+        root_tex = [[sqrt_tex(v) for v in row] for row in cfg.MAIN_SIGMA]
+        attempt_two = self._attempt_row(
+            "Attempt 2: root of each entry",
             VGroup(
                 th.math("A =", th.CAPTION_SIZE),
                 make_symbolic_matrix(root_tex, th.COLOR_TEXT, th.CAPTION_SIZE),
             ),
-            root,
-            "A^2",
-        )
-        attempt_two = self._attempt_row(
-            "Attempt 2: multiply by Σ",
-            make_labeled_matrix(r"\Sigma", cfg.MAIN_SIGMA, th.COLOR_SIGMA, th.CAPTION_SIZE),
-            np.asarray(cfg.MAIN_SIGMA),
-            r"\Sigma^2",
+            mm.elementwise_sqrt(cfg.MAIN_SIGMA),
+            th.math(r"\neq \Sigma", th.CAPTION_SIZE, th.COLOR_BAD),
         )
         rows = VGroup(attempt_one, attempt_two).arrange(DOWN, buff=0.15)
         rows.next_to(target, DOWN, buff=0.1).set_x(0)
+        for row in rows:  # line up the plots and arrows of both rows
+            row[1:].shift((rows[0][2].get_x() - row[2].get_x()) * RIGHT)
 
-        self.play(FadeIn(title), FadeIn(target), run_time=cfg.T_SHORT)
+        one_caption = th.caption("Just like 1D: multiplying by the variance squares it.")
+        self.play(FadeOut(bridge), FadeTransform(caption, one_caption), run_time=cfg.T_SHORT)
+        self.play(FadeIn(target), run_time=cfg.T_SHORT)
         self._play_attempt(attempt_one)
         self.reveal()
+
+        two_caption = th.caption(
+            "Square-rooting each entry doesn't work."
+            " Matrices need a better definition of square root."
+        )
+        self.play(FadeOut(one_caption), run_time=cfg.T_SHORT)
         self._play_attempt(attempt_two)
-        self.reveal()
-        self.play(FadeIn(th.caption("Element-wise thinking fails. We need a better definition.")))
+        self.play(FadeIn(two_caption), run_time=cfg.T_SHORT)
 
     def _attempt_row(
-        self, label: str, matrix_mob: VGroup, matrix: np.ndarray, square_tex: str
+        self, label: str, matrix_mob: VGroup, matrix: np.ndarray, verdict: Mobject
     ) -> VGroup:
-        """One row of slide 1.8: the guess, its cloud vs the target, the measured covariance.
+        """One attempt: the guess, its cloud vs the dashed target, and the measured covariance.
 
-        The cloud uses the displayed samples, the measured covariance uses all
-        N_STATS samples; both go through the same matrix. The measured
-        covariance is labeled as the square of the guess (``square_tex``): the
-        guesses are symmetric, so A A^T = A^2, which is easier to read here
-        than the general A A^T that slide 2.1 derives.
+        The cloud uses the displayed samples; the measured covariance uses all
+        N_STATS samples, both through the same matrix. It is labeled
+        "measured" on purpose: slide 2.1 derives the exact values.
         """
         matrix_mob.arrange(RIGHT, buff=0.2)
         guess = VGroup(th.text(label, th.CAPTION_SIZE), matrix_mob).arrange(
             DOWN, buff=0.2, aligned_edge=LEFT
         )
-        produced = mm.covariance_after_matrix(matrix)
+        produced = mm.covariance_of_linear_map(matrix)
         half_width = mm.shared_half_width(
             [cfg.MAIN_SIGMA, produced], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP
         )
@@ -630,10 +1069,17 @@ class S1Problem(DeckSlide):
             make_cov_ellipse(cfg.MAIN_SIGMA, (0.0, 0.0), cfg.QUESTION_ELLIPSE_K, axes)
         )
         measured_cov = mm.sample_cov(mm.transform(self.z_stats, np.zeros(2), matrix))
-        measured = VGroup(
-            th.math(square_tex + r" \approx"),
-            make_matrix(measured_cov, th.COLOR_X, th.CAPTION_SIZE, fixed=True),
+        measured_matrix = VGroup(
+            make_symbolic_matrix(
+                [[fmt(v, cfg.MEASURED_DECIMALS, fixed=True) for v in row] for row in measured_cov],
+                th.COLOR_X,
+                th.CAPTION_SIZE,
+            ),
+            verdict,
         ).arrange(RIGHT, buff=0.2)
+        measured = VGroup(
+            th.text("Measured ≈", th.CAPTION_SIZE, th.COLOR_MUTED), measured_matrix
+        ).arrange(DOWN, buff=0.15, aligned_edge=LEFT)
         plot = VGroup(axes, cloud, target_ellipse)
         arrow_in = Arrow(LEFT, RIGHT, color=th.COLOR_MUTED).scale(0.35)
         arrow_out = arrow_in.copy()
