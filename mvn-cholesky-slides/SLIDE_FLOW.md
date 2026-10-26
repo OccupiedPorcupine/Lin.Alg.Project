@@ -29,6 +29,18 @@ each slide is.
 - **Clicks:**
   1. "Simulating the Multivariate Normal / with a Given Covariance Matrix", subtitle "Cholesky decomposition and covariance structures", presenter name.
 
+### 0.0 Section slide: Motivating problems (where can this be implemented)
+### 0.1 Where this is used
+`slide_0_1_where_used`
+- **Clicks:**
+  go deeper for each topic, one slide for each one. with the title being the use case. 
+  1. Monte Carlo risk and portfolio simulation
+    - put in some graphs that that's relavant to having correlated multivariate data 
+  2. Gaussian processes
+    - what are gaussian processes 
+  3. Synthetic data generation
+    - give a use case for this
+
 ### 1.0 Section slide: Problem
 `slide_1_0_section`
 - **Point:** open section 1.
@@ -43,13 +55,13 @@ each slide is.
 
 ### 1.2 What computers give us
 `slide_1_2_what_computers_give`
-- **Point:** computers give us independent standard normals, N(0, I).
+- **Point:** computers give us independent standard normals, N(0, I). (label the normal distribution. We dont want to rely on people remembering the exact form fo the normal distribution, so we shoul write it there)
 - **Clicks:**
   1. NumPy code (`rng.standard_normal((800, 2))`), the 1D density N(0, 1): phi(z) = e^(-z^2/2) / sqrt(2 pi), then z = (z1, z2) ~ N(0, I), with the blue round cloud on the right. Caption: "Independent. No correlation."
 
 ### 1.3 What we want
 `slide_1_3_what_we_want`
-- **Point:** we want N(mu, Sigma); Sigma is the blueprint.
+- **Point:** we want N(mu, Sigma); Sigma is the blueprint. <- just have N(mu, Sigma) instead of the entire multivariate formula
 - **Clicks:**
   1. The MVN density formula f(x) in display form.
   2. mu = [mu_x; mu_y] and Sigma = [sigma_xx, sigma_xy; sigma_yx, sigma_yy] (symbols). Diagonal boxed: "variances". Off-diagonal dashed: "covariances".
@@ -225,13 +237,6 @@ each slide is.
 `slide_4_1_recap`
 - **Clicks:**
   1. "Cholesky turns independent noise / into the correlation structure you chose." Blue cloud, arrow labeled x = mu + L z, orange cloud.
-
-### 4.2 Where this is used
-`slide_4_2_where_used`
-- **Clicks:**
-  1. Monte Carlo risk and portfolio simulation
-  2. Gaussian processes
-  3. Synthetic data generation
 
 ### 4.3 Limits
 `slide_4_3_limits`

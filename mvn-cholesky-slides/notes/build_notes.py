@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT))
 
 import config  # noqa: E402
 
-SCENE_FILES = ["s1_problem.py", "s2_solution.py", "s3_demo.py", "s4_wrapup.py"]
+SCENE_FILES = ["s1_problem.py", "s2_solution.py", "s3_sampler.py", "s4_wrapup.py"]
 OUTPUT = ROOT / "notes" / "speaker_notes.md"
 
 
@@ -49,7 +49,7 @@ def _slide_heading(method: ast.FunctionDef, section_name: str) -> str:
     section slide, or fall back to the method name.
     """
     _, major, minor, *words = method.name.split("_")
-    number = f"{major}.{minor}"
+    number = f"{major.upper()}.{minor}"  # "a_1" (the appendix) becomes "A.1"
     for node in ast.walk(method):
         if isinstance(node, ast.Call):
             called = getattr(node.func, "attr", "")

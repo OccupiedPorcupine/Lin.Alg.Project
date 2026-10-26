@@ -5,8 +5,10 @@ so changing a matrix in ``config.py`` changes the whole deck consistently.
 
 Conventions:
     * Samples are stored as rows: an (n, dim) array where each row is a vector.
-    * Because of that, the column-vector formula x = mu + L z becomes
-      X = mu + Z @ L.T when applied to every row at once.
+    * Because of that, the column-vector formula x = mu + G z becomes
+      X = mu + Z @ G.T when applied to every row at once.
+    * G always means the Cholesky factor (lower triangular, G G^T = Sigma).
+      L only means the unit lower triangular factor from elimination (2.4).
 """
 
 from __future__ import annotations
@@ -38,15 +40,15 @@ def standard_normal_samples(n: int, dim: int, seed: int) -> Array:
     return rng.standard_normal((n, dim))
 
 
-def transform(z: ArrayLike, mu: ArrayLike, matrix: ArrayLike) -> Array:
-    """Map standard normal samples through x = mu + A z.
+def transform(z: ArrayLike, mu: ArrayLike, chol: ArrayLike) -> Array:
+    """Map standard normal samples through x = mu + G z.
 
-    With A = L, the Cholesky factor of Sigma, the result is N(mu, Sigma). Any
-    other matrix also works here (slide 1.8 tries a few), giving N(mu, A A^T).
+    With G the Cholesky factor of Sigma, the result is N(mu, Sigma). Any other
+    matrix A also works here (slide 1.7 tries a few), giving N(mu, A A^T).
     Works for a single vector of shape (dim,) or many rows of shape (n, dim).
     """
     z = np.asarray(z, dtype=float)
-    return np.asarray(mu, dtype=float) + z @ np.asarray(matrix, dtype=float).T
+    return np.asarray(mu, dtype=float) + z @ np.asarray(chol, dtype=float).T
 
 
 def sample_mean(samples: ArrayLike) -> Array:
@@ -59,6 +61,11 @@ def sample_cov(samples: ArrayLike) -> Array:
     return np.cov(np.asarray(samples, dtype=float), rowvar=False)
 
 
+def sample_corr(samples: ArrayLike) -> Array:
+    """Sample correlation matrix of the rows (covariance rescaled to unit variances)."""
+    return np.corrcoef(np.asarray(samples, dtype=float), rowvar=False)
+
+
 # --- Cholesky -----------------------------------------------------------------
 
 
@@ -67,7 +74,7 @@ class NotPositiveDefiniteError(ValueError):
 
 
 def cholesky_factor(sigma: ArrayLike) -> Array:
-    """Lower-triangular L with positive diagonal such that L L^T = Sigma.
+    """Lower-triangular G with positive diagonal such that G G^T = Sigma.
 
     Wraps ``np.linalg.cholesky`` so that a bad covariance matrix produces a
     message a human can act on, instead of a bare LinAlgError.
@@ -86,11 +93,11 @@ def cholesky_factor(sigma: ArrayLike) -> Array:
 
 
 def cholesky_manual(sigma: ArrayLike) -> Array:
-    """Teaching version of Cholesky, entry by entry (the formulas on slide 2.4).
+    """Teaching version of Cholesky, entry by entry (the formulas on slide 2.4e).
 
     Column j is filled top to bottom:
-        L_jj = sqrt(Sigma_jj - sum_{k<j} L_jk^2)
-        L_ij = (Sigma_ij - sum_{k<j} L_ik L_jk) / L_jj      for i > j
+        g_jj = sqrt(sigma_jj - sum_{k<j} g_jk^2)
+        g_ij = (sigma_ij - sum_{k<j} g_ik g_jk) / g_jj      for i > j
     Each column only needs the columns to its left, which is why one pass works.
     """
     sigma = np.asarray(sigma, dtype=float)
@@ -101,7 +108,7 @@ def cholesky_manual(sigma: ArrayLike) -> Array:
         remaining = sigma[j, j] - np.dot(chol[j, :j], chol[j, :j])
         if remaining <= 0:
             raise NotPositiveDefiniteError(
-                f"Pivot {j} is {remaining:.3g}; Sigma is not positive definite."
+                f"Pivot {j + 1} is {remaining:.3g}; Sigma is not positive definite."
             )
         chol[j, j] = math.sqrt(remaining)
         for i in range(j + 1, size):
@@ -109,52 +116,126 @@ def cholesky_manual(sigma: ArrayLike) -> Array:
     return chol
 
 
-@dataclass(frozen=True)
-class Cholesky2x2Steps:
-    """Every intermediate value of the 2x2 hand calculation on slide 2.4."""
+def triangle_solve_2x2(sigma: ArrayLike) -> tuple[float, float, float]:
+    """Solve A A^T = Sigma for A = [[a, 0], [c, d]] (slide 2.3).
 
-    sigma11: float
-    sigma21: float
-    sigma22: float
-    l11: float  # sqrt(sigma11)
-    l21: float  # sigma21 / l11
-    l21_sq: float  # l21 squared, subtracted from sigma22
-    l22: float  # sqrt(sigma22 - l21^2)
-
-    @property
-    def factor(self) -> Array:
-        return np.array([[self.l11, 0.0], [self.l21, self.l22]])
-
-
-def cholesky_2x2_steps(sigma: ArrayLike) -> Cholesky2x2Steps:
-    """Cholesky of a 2x2 matrix, keeping each step so a slide can show it."""
+    Forcing the top-right entry b to 0 turns the three equations
+        a^2 + b^2 = sigma_11,  ac + bd = sigma_21,  c^2 + d^2 = sigma_22
+    into a chain that solves one unknown at a time: a, then c, then d.
+    """
     sigma = np.asarray(sigma, dtype=float)
-    l11 = math.sqrt(sigma[0, 0])
-    l21 = sigma[1, 0] / l11
-    l22_sq = sigma[1, 1] - l21**2
-    if l22_sq <= 0:
+    a = math.sqrt(sigma[0, 0])
+    c = sigma[1, 0] / a
+    d_sq = sigma[1, 1] - c**2
+    if d_sq <= 0:
         raise NotPositiveDefiniteError("Sigma is not positive definite.")
-    return Cholesky2x2Steps(
-        sigma11=float(sigma[0, 0]),
-        sigma21=float(sigma[1, 0]),
-        sigma22=float(sigma[1, 1]),
-        l11=l11,
-        l21=l21,
-        l21_sq=l21**2,
-        l22=math.sqrt(l22_sq),
+    return a, c, math.sqrt(d_sq)
+
+
+@dataclass(frozen=True)
+class EliminationStep:
+    """One row operation R_target <- R_target - multiplier * R_source (rows 0-based)."""
+
+    target_row: int
+    source_row: int
+    multiplier: float
+    result_row: Array  # the target row after the operation
+
+
+@dataclass(frozen=True)
+class LDLSteps:
+    """The full hand route of slide 2.4: LU, then LDV, then LDL^T, then G G^T."""
+
+    steps: list[EliminationStep]
+    lower: Array  # L: unit lower triangular, holds the multipliers
+    upper: Array  # U: what is left after elimination
+    pivots: Array  # diagonal of U
+    diag: Array  # D = diag(pivots)
+    v: Array  # V = D^-1 U, equal to L^T because Sigma is symmetric
+    chol: Array  # G = L sqrt(D)
+
+
+def ldl_steps(sigma: ArrayLike) -> LDLSteps:
+    """Gaussian elimination on Sigma, keeping every step so a slide can show it.
+
+    Elimination gives Sigma = L U. Pulling the pivots out of U gives
+    Sigma = L D V, symmetry makes V = L^T, and splitting D into two square
+    roots gives Sigma = (L sqrt(D)) (L sqrt(D))^T = G G^T. Raises if a pivot
+    is not strictly positive, which is exactly when Cholesky does not exist.
+    """
+    upper = np.asarray(sigma, dtype=float).copy()
+    size = upper.shape[0]
+    lower = np.eye(size)
+    steps = []
+    for col in range(size):
+        if upper[col, col] <= 0:
+            raise NotPositiveDefiniteError(
+                f"Pivot {col + 1} is {upper[col, col]:.3g}; Sigma is not positive definite."
+            )
+        for row in range(col + 1, size):
+            multiplier = upper[row, col] / upper[col, col]
+            upper[row] -= multiplier * upper[col]
+            upper[row, col] = 0.0  # exact zero, not a 1e-17 rounding leftover
+            lower[row, col] = multiplier
+            steps.append(EliminationStep(row, col, multiplier, upper[row].copy()))
+    pivots = np.diag(upper).copy()
+    return LDLSteps(
+        steps=steps,
+        lower=lower,
+        upper=upper,
+        pivots=pivots,
+        diag=np.diag(pivots),
+        v=upper / pivots[:, None],
+        chol=lower * np.sqrt(pivots)[None, :],  # scale column j of L by sqrt(pivot j)
     )
 
 
-def mixing_factor(rho: float) -> Array:
-    """Closed-form Cholesky factor of [[1, rho], [rho, 1]].
+@dataclass(frozen=True)
+class CholeskyEntry:
+    """One entry of G from the direct solve on slide 2.4e (indices 0-based).
 
-    L = [[1, 0], [rho, sqrt(1 - rho^2)]], so x1 = z1 and
-    x2 = rho z1 + sqrt(1 - rho^2) z2.
-    The max(0, ...) keeps it finite at |rho| = 1, where the true Cholesky
-    factorization fails. That lets the rho sweep animate right up to the
-    breaking point without raising.
+    Diagonal:  value = sqrt(sigma_entry - sum(subtracted))
+    Below:     value = (sigma_entry - sum(subtracted)) / divisor
+    ``subtracted`` lists the products g_ik g_jk (k < j) already known.
     """
-    return np.array([[1.0, 0.0], [rho, math.sqrt(max(0.0, 1.0 - rho**2))]])
+
+    row: int
+    col: int
+    sigma_entry: float
+    subtracted: list[float]
+    divisor: float | None  # g_jj for entries below the diagonal, None on the diagonal
+    value: float
+
+    @property
+    def is_diagonal(self) -> bool:
+        return self.row == self.col
+
+
+def cholesky_direct_steps(sigma: ArrayLike) -> list[CholeskyEntry]:
+    """Every g_ij in the order slide 2.4e solves them: column by column, top down."""
+    sigma = np.asarray(sigma, dtype=float)
+    size = sigma.shape[0]
+    chol = np.zeros_like(sigma)
+    entries = []
+    for j in range(size):
+        for i in range(j, size):
+            subtracted = [float(chol[i, k] * chol[j, k]) for k in range(j)]
+            remaining = sigma[i, j] - sum(subtracted)
+            if i == j:
+                if remaining <= 0:
+                    raise NotPositiveDefiniteError("Sigma is not positive definite.")
+                chol[i, j] = math.sqrt(remaining)
+                divisor = None
+            else:
+                divisor = float(chol[j, j])
+                chol[i, j] = remaining / divisor
+            entries.append(
+                CholeskyEntry(i, j, float(sigma[i, j]), subtracted, divisor, float(chol[i, j]))
+            )
+    return entries
+
+
+# --- Unit-variance correlation (slide 3.4) -------------------------------------
 
 
 def correlation_matrix(rho: float) -> Array:
@@ -162,41 +243,46 @@ def correlation_matrix(rho: float) -> Array:
     return np.array([[1.0, rho], [rho, 1.0]])
 
 
-def variance_shares(rho: float) -> tuple[float, float]:
-    """Split Var(x2) = 1 into the part shared with x1 and fresh noise.
+def unit_corr_pivot(rho: float) -> float:
+    """Second pivot of [[1, rho], [rho, 1]]: elimination leaves 1 - rho^2.
 
-    From x2 = rho z1 + sqrt(1 - rho^2) z2 the shares are rho^2 and 1 - rho^2.
+    Positive for |rho| < 1, zero at |rho| = 1, negative beyond.
     """
-    return rho**2, 1.0 - rho**2
+    return 1.0 - rho**2
 
 
-# --- Failed "square roots" from slide 1.8 --------------------------------------
+def unit_corr_factor(rho: float) -> Array | None:
+    """Closed-form Cholesky factor of [[1, rho], [rho, 1]].
+
+    G = [[1, 0], [rho, sqrt(1 - rho^2)]], so x1 = z1 and
+    x2 = rho z1 + sqrt(1 - rho^2) z2. At |rho| = 1 the pivot is 0 and this
+    returns the degenerate [[1, 0], [rho, 0]] instead of raising, so the sweep
+    can animate right up to the breaking point. Beyond that the pivot is
+    negative, no real factor exists, and this returns None.
+    """
+    pivot = unit_corr_pivot(rho)
+    if pivot < -1e-12:
+        return None
+    return np.array([[1.0, 0.0], [rho, math.sqrt(max(0.0, pivot))]])
+
+
+# --- Linear maps and failed "square roots" (slides 1.7 and 2.1) -----------------
+
+
+def covariance_of_linear_map(matrix: ArrayLike) -> Array:
+    """Covariance of A z when z ~ N(0, I): exactly A A^T (slide 2.1)."""
+    matrix = np.asarray(matrix, dtype=float)
+    return matrix @ matrix.T
 
 
 def elementwise_sqrt(sigma: ArrayLike) -> Array:
-    """Entry-by-entry square root of Sigma (the naive guess on slide 1.8).
+    """Entry-by-entry square root of Sigma (the naive guess on slide 1.7).
 
     The sign is kept so a negative covariance gives a negative entry instead of
     NaN. For the main example all entries are positive, so this is plain sqrt.
     """
     sigma = np.asarray(sigma, dtype=float)
     return np.sign(sigma) * np.sqrt(np.abs(sigma))
-
-
-def elementwise_sqrt_covariance(sigma: ArrayLike) -> Array:
-    """Covariance produced by the naive guess: A A^T with A = elementwise sqrt.
-
-    This is what the measured covariance on slide 1.8 converges to, and slide
-    2.1 explains why.
-    """
-    root = elementwise_sqrt(sigma)
-    return root @ root.T
-
-
-def covariance_after_matrix(matrix: ArrayLike) -> Array:
-    """Covariance of A z when z ~ N(0, I): exactly A A^T (slide 2.1)."""
-    matrix = np.asarray(matrix, dtype=float)
-    return matrix @ matrix.T
 
 
 # --- Geometry of the covariance ellipse ----------------------------------------
@@ -228,8 +314,8 @@ def covariance_ellipse_params(sigma: ArrayLike, k: float) -> tuple[float, float,
     the first eigenvector.
     """
     values, vectors = eigen_axes(sigma)
-    width = 2.0 * k * math.sqrt(values[0])
-    height = 2.0 * k * math.sqrt(values[1])
+    width = 2.0 * k * math.sqrt(max(0.0, values[0]))
+    height = 2.0 * k * math.sqrt(max(0.0, values[1]))
     angle = math.atan2(vectors[1, 0], vectors[0, 0])
     return width, height, angle
 
@@ -259,9 +345,57 @@ def mvn_density(x: ArrayLike, mu: ArrayLike, sigma: ArrayLike) -> float:
 
 
 def normal_pdf_1d(x: ArrayLike, mu: float, sd: float) -> Array:
-    """The 1D normal pdf, used to draw bell curves on slide 1.6."""
+    """The 1D normal pdf, used to draw bell curves (slides 1.4 and 1.6)."""
     x = np.asarray(x, dtype=float)
     return np.exp(-0.5 * ((x - mu) / sd) ** 2) / (sd * math.sqrt(2.0 * math.pi))
+
+
+# --- Applications (slides 1.1 and 4.2) -------------------------------------------
+
+
+def rbf_kernel(xs: ArrayLike, length_scale: float) -> Array:
+    """Gaussian process covariance: k(x, x') = exp(-(x - x')^2 / (2 l^2)).
+
+    Points close together get covariance near 1 (they move together), far
+    apart near 0. Without a small jitter on the diagonal this matrix is
+    numerically singular, so plain Cholesky fails on it.
+    """
+    xs = np.asarray(xs, dtype=float)
+    gaps = xs[:, None] - xs[None, :]
+    return np.exp(-0.5 * (gaps / length_scale) ** 2)
+
+
+def gp_grid(x_range: tuple[float, float], n_points: int) -> Array:
+    """The evenly spaced x positions of the Gaussian process panel."""
+    return np.linspace(x_range[0], x_range[1], n_points)
+
+
+def gp_curves(z: ArrayLike, xs: ArrayLike, length_scale: float, jitter: float) -> Array:
+    """Smooth random curves x = G z, one per row of ``z``.
+
+    G is the Cholesky factor of the RBF kernel plus jitter. Each row of z is
+    60 independent jagged values; each output row is the smooth curve they
+    become. The same z gives the same curves, which is how 4.2 replays 1.1.
+    """
+    kernel = rbf_kernel(xs, length_scale) + jitter * np.eye(len(np.asarray(xs)))
+    return transform(z, np.zeros(kernel.shape[0]), cholesky_factor(kernel))
+
+
+def portfolio_returns(weights: ArrayLike, rho: float, n: int, seed: int) -> Array:
+    """Simulated returns of a two-stock portfolio with unit-variance stocks.
+
+    Stock returns are N(0, [[1, rho], [rho, 1]]); the portfolio return is the
+    weighted sum. Using the same seed for every rho means the two histograms on
+    slide 1.1 differ only because of the correlation.
+    """
+    z = standard_normal_samples(n, 2, seed)
+    stocks = transform(z, np.zeros(2), unit_corr_factor(rho))
+    return stocks @ np.asarray(weights, dtype=float)
+
+
+def value_at_risk(returns: ArrayLike, level: float) -> float:
+    """The ``level`` quantile of the returns: a loss this bad happens level of the time."""
+    return float(np.quantile(np.asarray(returns, dtype=float), level))
 
 
 # --- Axis ranges --------------------------------------------------------------
