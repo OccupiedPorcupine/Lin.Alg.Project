@@ -443,7 +443,7 @@ class S2Solution(DeckSlide):
             make_symbolic_matrix(result_entries, th.COLOR_TEXT, size),
         ).arrange(RIGHT, buff=0.2)
         cross = make_cross_mark(0.35)
-        row = VGroup(a_block, lines, result, cross).arrange(RIGHT, buff=0.45)
+        row = VGroup(a_block, lines, result, cross).arrange(RIGHT, buff=0.3)
         return VGroup(th.text(label, size, th.COLOR_MUTED), row).arrange(
             DOWN, buff=0.15, aligned_edge=LEFT
         )
@@ -632,17 +632,22 @@ class S2Solution(DeckSlide):
         caption = th.caption("Force the top-right to zero: the equations solve one at a time.")
         self.play(FadeIn(caption), FadeIn(key_box, scale=1.05), run_time=cfg.T_MEDIUM)
         self.triangle_leftovers = VGroup(triangle, solves, caption)
+        self.triangle_key = key_box
         return a_block
 
     def _play_cholesky_facts(self, title: Mobject, g_block: VGroup) -> None:
         """Three facts about Cholesky, one per click."""
-        self.play(FadeOut(self.triangle_leftovers), run_time=cfg.T_SHORT)
+        self.play(
+            FadeOut(self.triangle_leftovers),
+            self.triangle_key.animate.next_to(g_block, DOWN, buff=0.35, aligned_edge=LEFT),
+            run_time=cfg.T_MEDIUM,
+        )
         facts = VGroup(
             th.text("1.  Unique (with a positive diagonal).", th.BODY_SIZE),
             th.text("2.  Exists exactly when Σ is symmetric positive definite.", th.BODY_SIZE),
             th.text("3.  Fast (about n³/3 operations) and numerically stable.", th.BODY_SIZE),
         ).arrange(DOWN, buff=0.35, aligned_edge=LEFT)
-        facts.next_to(g_block, DOWN, buff=0.6).align_to(title, LEFT)
+        facts.next_to(self.triangle_key, DOWN, buff=0.5).align_to(title, LEFT)
         for index, fact in enumerate(facts):
             if index > 0:
                 self.reveal()
@@ -672,7 +677,7 @@ class S2Solution(DeckSlide):
             row.arrange(RIGHT, buff=0.25)
         rows.arrange(RIGHT, buff=1.0)
         aside = VGroup(question, rows).arrange(DOWN, buff=0.4, aligned_edge=LEFT)
-        aside.next_to(g_block, DOWN, buff=0.6).align_to(title, LEFT)
+        aside.next_to(self.triangle_key, DOWN, buff=0.5).align_to(title, LEFT)
         self.play(FadeIn(question), run_time=cfg.T_SHORT)
         for row in rows:
             self.play(FadeIn(row[:3]), run_time=cfg.T_MEDIUM)
@@ -749,6 +754,7 @@ class S2Solution(DeckSlide):
         self.play(
             Transform(work_label, u_label),
             work.get_brackets().animate.set_color(th.COLOR_TEXT),
+            *[entry_at(work, 0, j).animate.set_color(th.COLOR_TEXT) for j in range(size)],
             run_time=cfg.T_SHORT,
         )
         self.play(Write(result), run_time=cfg.T_SHORT)
@@ -799,14 +805,17 @@ class S2Solution(DeckSlide):
         diag = tex_matrix(route.diag)
         v_mat = tex_matrix(route.v)
         row = VGroup(th.math("U ="), upper, th.math("="), diag, v_mat)
-        row.arrange(RIGHT, buff=0.25).next_to(title, DOWN, buff=0.8).set_x(0)
+        row.arrange(RIGHT, buff=0.3).next_to(title, DOWN, buff=0.8).set_x(0)
         names = VGroup(
             th.math("D", th.CAPTION_SIZE, th.COLOR_MUTED).next_to(diag, DOWN, buff=0.2),
             th.math("V", th.CAPTION_SIZE, th.COLOR_MUTED).next_to(v_mat, DOWN, buff=0.2),
         )
         size = len(route.pivots)
         boxes = VGroup(
-            *[SurroundingRectangle(entry_at(upper, k, k), color=th.COLOR_GOOD) for k in range(size)]
+            *[
+                SurroundingRectangle(entry_at(upper, k, k), color=th.COLOR_GOOD, buff=0.06)
+                for k in range(size)
+            ]
         )
         pivots_label = th.text("pivots", th.CAPTION_SIZE, th.COLOR_GOOD)
         pivots_label.next_to(upper, DOWN, buff=0.2)
@@ -848,7 +857,7 @@ class S2Solution(DeckSlide):
         lower = tex_matrix(route.lower)
         v_mat = tex_matrix(route.v)
         blocks = VGroup(labeled("L", lower), labeled("V", v_mat)).arrange(RIGHT, buff=2.2)
-        blocks.next_to(title, DOWN, buff=0.7).set_x(0)
+        blocks.next_to(title, DOWN, buff=0.45).set_x(0)
 
         self.play(FadeIn(title), FadeIn(blocks), run_time=cfg.T_MEDIUM)
         self.reveal()
@@ -875,8 +884,8 @@ class S2Solution(DeckSlide):
         ).arrange(DOWN, buff=0.25)
         reason[0][0][0].set_color(th.COLOR_SIGMA)
         reason[0][0][2].set_color(th.COLOR_SIGMA)
-        reason.next_to(lands, DOWN, buff=0.5).set_x(0)
-        result = th.math(r"\Sigma = L\,D\,L^T", th.TITLE_SIZE).next_to(reason, DOWN, buff=0.4)
+        reason.next_to(lands, DOWN, buff=0.4).set_x(0)
+        result = th.math(r"\Sigma = L\,D\,L^T", th.TITLE_SIZE).next_to(reason, DOWN, buff=0.3)
         result[0][0].set_color(th.COLOR_SIGMA)
         self.play(FadeIn(reason), run_time=cfg.T_MEDIUM)
         self.play(Write(result), run_time=cfg.T_SHORT)
@@ -899,16 +908,18 @@ class S2Solution(DeckSlide):
         route = mm.ldl_steps(cfg.EXAMPLE_3X3_SIGMA)
         title = th.slide_title("Step 4: split D in half, giving G Gᵀ")
         roots = ",\\ ".join(fmt(np.sqrt(p)) for p in route.pivots)
+        size = th.CAPTION_SIZE
         split = th.math(
-            rf"D = \sqrt{{D}}\,\sqrt{{D}}, \qquad \sqrt{{D}} = \operatorname{{diag}}({roots})"
+            rf"D = \sqrt{{D}}\,\sqrt{{D}}, \qquad \sqrt{{D}} = \operatorname{{diag}}({roots})",
+            size,
         )
         regroup = colored_math(
             r"\Sigma",
             r"= L\sqrt{D}\,\sqrt{D}\,L^T = (L\sqrt{D})(L\sqrt{D})^T =",
             "G",
             "G^T",
+            size=size,
         )
-        size = th.CAPTION_SIZE
         compute = VGroup(
             colored_math("G", r"= L\sqrt{D} =", size=size),
             tex_matrix(route.lower, size=size),
@@ -922,8 +933,8 @@ class S2Solution(DeckSlide):
             colored_math("=", r"\Sigma", size=size),
             make_check_mark(0.4),
         ).arrange(RIGHT, buff=0.2)
-        lines = VGroup(split, regroup, compute, verify).arrange(DOWN, buff=0.4, aligned_edge=LEFT)
-        lines.next_to(title, DOWN, buff=0.4).align_to(title, LEFT)
+        lines = VGroup(split, regroup, compute, verify).arrange(DOWN, buff=0.3, aligned_edge=LEFT)
+        lines.next_to(title, DOWN, buff=0.35).align_to(title, LEFT)
 
         self.play(FadeIn(title), Write(split), run_time=cfg.T_MEDIUM)
         self.reveal()
@@ -1006,7 +1017,7 @@ class S2Solution(DeckSlide):
         g_block = VGroup(th.math("G =", th.CAPTION_SIZE, th.COLOR_G), g_mat).arrange(
             RIGHT, buff=0.2
         )
-        g_block.next_to(top, RIGHT, buff=0.6)
+        g_block.next_to(top, DOWN, buff=0.5).to_edge(RIGHT, buff=th.EDGE_BUFF)
 
         self.play(FadeIn(title), FadeIn(top), FadeIn(g_block), run_time=cfg.T_MEDIUM)
         self.reveal()

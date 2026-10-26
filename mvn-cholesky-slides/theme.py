@@ -107,15 +107,15 @@ HIST_HEIGHT = 3.2
 HEATMAP_CELL = 0.8  # side of one cell of the correlation heatmaps (1.1)
 PANEL_CODE_CLOUD = 4.0  # the N(0, I) cloud beside the code (1.2)
 PANEL_THUMB = 1.9  # the shrunken blue cloud in the corner (1.3)
-PANEL_FORMULA = 4.0  # the cloud with points A and B (1.4)
+PANEL_FORMULA = 4.4  # the zoomed cloud with points A and B (1.4)
 FORMULA_BELL_WIDTH = 3.4  # the small bell curve beside the 1D formula (1.4)
 FORMULA_BELL_HEIGHT = 1.4
 PANEL_ROW = 1.8  # side of each plot in the two attempt rows (1.7)
 
 # --- Section 2 layout (scenes/s2_solution.py) --------------------------------
 
-PANEL_ROTATION = 3.4  # the rotating round cloud (2.2), below the legend
-ROTATION_PANEL_CENTER = (4.3, -0.95)
+PANEL_ROTATION = 3.2  # the rotating round cloud (2.2), below the legend
+ROTATION_PANEL_CENTER = (4.3, -1.2)
 TRIANGLE_SOLVE_X = -1.2  # left edge of the solving steps on 2.3
 TRIANGLE_KEY_Y = -2.1  # the boxed "Cholesky: Sigma = G G^T" line on 2.3
 HERO_SIDE_CENTER = (3.6, 1.1)  # x = mu + G z with G and mu, beside the hero plane (2.5)
@@ -125,7 +125,7 @@ HERO_SIDE_CENTER = (3.6, 1.1)  # x = mu + G z with G and mu, beside the hero pla
 PANEL_SWEEP = 5.0  # the single large plot of the rho sweep (slide 3.4)
 VERIFY_PLANE_HEIGHT = 5.2  # 3.1 shrinks the hero plane to this height to make room
 VERIFY_PLANE_CENTER = (-3.7, -0.15)
-DEMO_PANEL = 2.5  # side of each plot in the row of four on slide 3.2
+DEMO_PANEL = 2.2  # side of each plot in the row of four on slide 3.2
 EIGEN_PANEL = 4.6  # the cloud on the eigen slide (3.3)
 EIGEN_TEST_PANEL = 3.2  # the small plane where Sigma is applied to test arrows (3.3)
 EIGEN_TEST_CENTER = (4.9, 0.75)  # top right, so the readouts fit underneath it on the left

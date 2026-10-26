@@ -157,8 +157,10 @@ class S1Problem(DeckSlide):
         self._hook_synthetic_data()
         self.reveal()
 
-        message = th.text("All three need random numbers that move together.", th.TITLE_SIZE)
-        message.scale_to_fit_width(min(message.width, th.MAX_CONTENT_WIDTH))
+        message = VGroup(
+            th.text("All three need random numbers", th.TITLE_SIZE),
+            th.text("that move together.", th.TITLE_SIZE),
+        ).arrange(DOWN, buff=0.25)
         self.play(FadeIn(make_dim_overlay()), run_time=cfg.T_SHORT)
         self.play(Write(message), run_time=cfg.T_MEDIUM)
 
@@ -208,47 +210,45 @@ class S1Problem(DeckSlide):
             for r in returns
         )
         axes = make_density_axes(x_lim, 1.15 * tallest, th.HIST_WIDTH, th.HIST_HEIGHT)
-        weights = "/".join(f"{w:.0%}".rstrip("%") for w in cfg.PORTFOLIO_WEIGHTS)
-        axis_name = th.text(
-            f"Portfolio return ({weights} weights, simulated)", th.MIN_SIZE, th.COLOR_MUTED
-        )
-        axis_name.next_to(axes, DOWN, buff=0.45)
-        VGroup(axes, axis_name).next_to(heading, DOWN, buff=0.9).set_x(0)
+        axes.y_axis.set_stroke(opacity=0)  # bar heights are not the point, only the spread
+        level = f"{cfg.VAR_LEVEL:.0%}".replace("%", r"\%")
+        var_values = [mm.value_at_risk(r, cfg.VAR_LEVEL) for r in returns]
+        legend = VGroup(
+            *[
+                th.math(
+                    rf"\rho = {fmt(rho)}:\ \ \text{{sd }} {fmt(spread, fixed=True)},"
+                    rf"\ \ {level}\ \text{{VaR }} {{{fmt(var, fixed=True)}}}",
+                    th.CAPTION_SIZE,
+                    color,
+                )
+                for rho, spread, var, color in zip(rhos, spreads, var_values, colors, strict=True)
+            ]
+        ).arrange(DOWN, buff=0.15, aligned_edge=LEFT)
+        legend.next_to(heading, DOWN, buff=0.3)
+        axes.next_to(legend, DOWN, buff=0.3).set_x(0)
         histograms = [
             make_histogram(r, axes, cfg.PORTFOLIO_HIST_BINS, color)
             for r, color in zip(returns, colors, strict=True)
         ]
-
-        var_lines, legend = VGroup(), VGroup()
-        level = f"{cfg.VAR_LEVEL:.0%}".replace("%", r"\%")
-        for rho, r, spread, color in zip(rhos, returns, spreads, colors, strict=True):
-            var = mm.value_at_risk(r, cfg.VAR_LEVEL)
-            var_lines.add(
+        var_lines = VGroup(
+            *[
                 DashedLine(axes.c2p(var, 0), axes.c2p(var, 0.8 * tallest), color=th.COLOR_BAD)
-            )
-            legend.add(
-                th.math(
-                    rf"\rho = {fmt(rho)}:\ \ \text{{sd }} {fmt(spread, fixed=True)},"
-                    rf"\ \ {level}\ \text{{VaR }} {fmt(var, fixed=True)}",
-                    th.CAPTION_SIZE,
-                    color,
-                )
-            )
-        legend.arrange(DOWN, buff=0.15, aligned_edge=LEFT)
-        legend.next_to(axes.c2p(x_lim[1], tallest), DL, buff=0).shift(0.1 * UP)
+                for var in var_values
+            ]
+        )
         var_label = th.text(f"{cfg.VAR_LEVEL:.0%} worst case", th.MIN_SIZE, th.COLOR_BAD).next_to(
             var_lines, UP, buff=0.12
         )
         caption = th.caption("Ignore correlation and you underestimate risk.")
 
+        weights = "/".join(f"{w:.0%}".rstrip("%") for w in cfg.PORTFOLIO_WEIGHTS)
         new_heading = th.text(
-            "Portfolio returns: independent vs correlated stocks", th.CAPTION_SIZE, th.COLOR_MUTED
+            f"Portfolio return ({weights} weights, simulated)", th.CAPTION_SIZE, th.COLOR_MUTED
         ).move_to(heading)
         self.play(
             FadeOut(VGroup(*[VGroup(p.axes, p.label, p.labels) for p in panels])),
             Transform(heading, new_heading),
             Create(axes),
-            FadeIn(axis_name),
             run_time=cfg.T_SHORT,
         )
         self.play(
@@ -277,7 +277,15 @@ class S1Problem(DeckSlide):
         previous = None
         for index in range(cfg.GP_N_CURVES):
             start, end = make_gp_states(self.gp_z[index], self.gp_x[index], axes)
-            fade_previous = [previous.animate.set_opacity(0.25)] if previous else []
+            # Dim the previous curve: stroke only, so the curve does not gain a fill.
+            fade_previous = (
+                [
+                    previous[0].animate.set_stroke(opacity=0.25),
+                    previous[1].animate.set_opacity(0.25),
+                ]
+                if previous
+                else []
+            )
             self.play(*fade_previous, FadeIn(start, lag_ratio=0.02), run_time=cfg.T_MEDIUM)
             if index == 0:
                 self.play(FadeIn(before), run_time=cfg.T_SHORT)
@@ -382,8 +390,8 @@ class S1Problem(DeckSlide):
         printed = [f"[{a:5.2f}, {b:5.2f}]" for a, b in shown]
         code = make_code(
             f"rng = np.random.default_rng({cfg.RANDOM_SEED})\n"
-            f"Z = rng.standard_normal(({cfg.N_DISPLAY}, 2))"
-            f"  # {cfg.N_DISPLAY} points, 2 variables\n"
+            f"Z = rng.standard_normal(({cfg.N_DISPLAY}, 2))\n"
+            f"# {cfg.N_DISPLAY} points (rows), 2 variables\n"
             "\n"
             f"Z[:{len(shown)}]\n"
             f"# [{printed[0]},\n"
@@ -391,7 +399,7 @@ class S1Problem(DeckSlide):
             + f"#  {printed[-1]}]"
         )
         code.next_to(title, DOWN, buff=0.35).align_to(title, LEFT)
-        first_row_line = 4  # code line index of the first printed row
+        first_row_line = 5  # code line index of the first printed row
         # Each value comes from the 1D standard normal; say which one, in full.
         one_d = th.math(
             r"\text{each value} \sim \mathcal{N}(0, 1):\quad"
@@ -413,7 +421,7 @@ class S1Problem(DeckSlide):
         rest = make_point_cloud(self.z_display[len(shown) :], axes, th.COLOR_Z)
         correlation = mm.sample_corr(self.z_stats)[0, 1]
         readout = th.math(
-            rf"\text{{Correlation between }} z_1 \text{{ and }} z_2 \approx"
+            rf"\text{{correlation}}(z_1, z_2) \approx"
             rf" {fmt(correlation, fixed=True)}",
             th.CAPTION_SIZE,
         ).next_to(names[0], DOWN, buff=0.15)
@@ -539,7 +547,7 @@ class S1Problem(DeckSlide):
             """
         )
         title = th.slide_title("Reading the formula: same idea as 1D")
-        size = th.CAPTION_SIZE
+        size = th.BODY_SIZE
         original = self._colored_formula(FORMULA_1D, [None, "norm", None, "dist", None], size)
         rearranged = self._colored_formula(FORMULA_1D_REARRANGED, FORMULA_ROLES, size)
         n_d = self._colored_formula(FORMULA_ND, FORMULA_ROLES, size)
@@ -595,18 +603,21 @@ class S1Problem(DeckSlide):
         # Distance term: drop the 1D row and the table, keep the nD formula on top.
         self.play(FadeOut(table), FadeOut(rearranged), FadeOut(row_names), run_time=cfg.T_SHORT)
         self.play(n_d.animate.next_to(title, DOWN, buff=0.4).set_x(0), run_time=cfg.T_SHORT)
-        distance_box = SurroundingRectangle(n_d[4:8], color=th.COLOR_DIST, buff=0.08)
+        distance_box = SurroundingRectangle(
+            n_d[4:8], color=th.COLOR_DIST, buff=0.1, corner_radius=0.12
+        )
         self._distance_points(distance_box)
 
     def _distance_points(self, distance_box: Mobject) -> None:
         """Points A and B, the same ruler distance from mu, with different Sigma distance."""
         mu = np.asarray(cfg.MAIN_MU)
-        half_width = mm.shared_half_width([cfg.MAIN_SIGMA], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
+        # A zoomed window around mu: the points of interest are only 2 units away.
+        half_width = cfg.FORMULA_ZOOM_HALF_WIDTH
         axes = make_square_axes(mu, half_width, th.PANEL_FORMULA)
         axes.next_to(distance_box, DOWN, buff=0.3).set_x(-3.0)
-        cloud = make_point_cloud(
-            mm.transform(self.z_display, mu, self.main_chol), axes, th.COLOR_X
-        ).set_opacity(0.35)
+        samples = mm.transform(self.z_display, mu, self.main_chol)
+        inside = np.all(np.abs(samples - mu) <= half_width, axis=1)  # only dots in the window
+        cloud = make_point_cloud(samples[inside], axes, th.COLOR_X).set_opacity(0.35)
         _, vectors = mm.eigen_axes(cfg.MAIN_SIGMA)
         distance = cfg.FORMULA_POINT_DISTANCE
         points = [mu + distance * vectors[:, 0], mu + distance * vectors[:, 1]]
@@ -664,14 +675,14 @@ class S1Problem(DeckSlide):
         contour_caption = th.caption(
             "Every point on one ellipse has the same distance, so the same density."
         )
-        self.play(Create(contours), FadeOut(ruler), FadeTransform(caption, contour_caption))
+        self.play(Create(contours), FadeOut(ruler), FadeOut(caption), FadeIn(contour_caption))
         self.reveal()
 
         final = th.caption(
             "Only two things change: numbers become vectors and matrices,"
             " and distance now accounts for tilt."
         )
-        self.play(FadeTransform(contour_caption, final), run_time=cfg.T_SHORT)
+        self.play(FadeOut(contour_caption), FadeIn(final), run_time=cfg.T_SHORT)
 
     @staticmethod
     def _colored_formula(parts: list[str], roles: list[str | None], size: float) -> MathTex:
@@ -858,7 +869,7 @@ class S1Problem(DeckSlide):
         why = th.math(r"\mathrm{Var}(a z) = a^2\, \mathrm{Var}(z)")
         why.next_to(top_left, DOWN, buff=0.35, aligned_edge=LEFT)
         why_caption = th.caption("Stretching by a multiplies the variance by a².")
-        self.play(Write(why), FadeTransform(caption, why_caption), run_time=cfg.T_MEDIUM)
+        self.play(Write(why), FadeOut(caption), FadeIn(why_caption), run_time=cfg.T_MEDIUM)
         self.reveal()
 
         # The fix: scale by the square root of the variance.
@@ -868,7 +879,8 @@ class S1Problem(DeckSlide):
         self.play(
             Transform(equation, fixed),
             FadeOut(cross),
-            FadeTransform(why_caption, fix_caption),
+            FadeOut(why_caption),
+            FadeIn(fix_caption),
             run_time=cfg.T_SHORT,
         )
         self.play(scale.animate.set_value(sd), run_time=cfg.T_LONG)
@@ -882,7 +894,8 @@ class S1Problem(DeckSlide):
         self.play(
             Transform(equation, shifted),
             check.animate.next_to(shifted, RIGHT, buff=0.35),
-            FadeTransform(fix_caption, shift_caption),
+            FadeOut(fix_caption),
+            FadeIn(shift_caption),
             run_time=cfg.T_SHORT,
         )
         self.play(shift.animate.set_value(mu), warmth.animate.set_value(1.0), run_time=cfg.T_LONG)
@@ -1028,7 +1041,7 @@ class S1Problem(DeckSlide):
             row[1:].shift((rows[0][2].get_x() - row[2].get_x()) * RIGHT)
 
         one_caption = th.caption("Just like 1D: multiplying by the variance squares it.")
-        self.play(FadeOut(bridge), FadeTransform(caption, one_caption), run_time=cfg.T_SHORT)
+        self.play(FadeOut(bridge), FadeOut(caption), FadeIn(one_caption), run_time=cfg.T_SHORT)
         self.play(FadeIn(target), run_time=cfg.T_SHORT)
         self._play_attempt(attempt_one)
         self.reveal()
@@ -1090,7 +1103,8 @@ class S1Problem(DeckSlide):
         guess, arrow_in, plot, arrow_out, measured, cross = row
         axes, cloud, target_ellipse = plot
         self.play(FadeIn(guess), run_time=cfg.T_MEDIUM)
-        self.play(GrowArrow(arrow_in), Create(axes), Create(target_ellipse), run_time=cfg.T_SHORT)
+        self.play(GrowArrow(arrow_in), Create(axes), run_time=cfg.T_SHORT)
         self.play(fade_in_cloud(cloud))
+        self.play(Create(target_ellipse), run_time=cfg.T_SHORT)  # on top of the dots
         self.play(GrowArrow(arrow_out), FadeIn(measured), run_time=cfg.T_MEDIUM)
         self.play(Create(cross), run_time=cfg.T_SHORT)

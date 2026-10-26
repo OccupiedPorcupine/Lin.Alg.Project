@@ -1,7 +1,6 @@
 .venv/
 media/
 slides/
-slides.html
 slides_assets/
 __pycache__/
 .pytest_cache/

@@ -51,8 +51,8 @@ def make_deformable_grid(axes: Axes, half_width: float) -> NumberPlane:
         y_range=[-half_width, half_width, 1],
         x_length=2 * half_width * unit,
         y_length=2 * half_width * unit,
-        background_line_style={"stroke_color": th.COLOR_TEXT, "stroke_opacity": 0.3},
-        axis_config={"stroke_color": th.COLOR_TEXT, "stroke_opacity": 0.3},
+        background_line_style={"stroke_color": th.COLOR_TEXT, "stroke_opacity": 0.45},
+        axis_config={"stroke_color": th.COLOR_TEXT, "stroke_opacity": 0.45},
     )
     return grid.shift(axes.c2p(0, 0) - grid.c2p(0, 0))
 
@@ -265,7 +265,7 @@ class S3Sampler(DeckSlide):
             *[self._demo_panel(name, sigma, half_width) for name, sigma in cfg.DEMO_STRUCTURES]
         )
         panels.arrange(RIGHT, buff=0.35, aligned_edge=UP)
-        panels.next_to(title, DOWN, buff=0.3).set_x(0)
+        panels.next_to(title, DOWN, buff=0.2).set_x(0)
         caption = th.caption(
             "Now we trust the machine. Feed it different Σ and watch what G does to the same cloud."
         )
@@ -316,9 +316,9 @@ class S3Sampler(DeckSlide):
         sigma_block = make_labeled_matrix(r"\Sigma", sigma, th.COLOR_SIGMA, size)
         g_block = make_labeled_matrix("G", mm.cholesky_factor(sigma), th.COLOR_G, size)
         # A single row of four panels: label, plot, then Sigma over G underneath.
-        matrices = VGroup(sigma_block, g_block).arrange(DOWN, buff=0.2)
-        matrices.next_to(axes, DOWN, buff=0.25)
-        label.next_to(axes, UP, buff=0.15)
+        matrices = VGroup(sigma_block, g_block).arrange(DOWN, buff=0.12)
+        matrices.next_to(axes, DOWN, buff=0.15)
+        label.next_to(axes, UP, buff=0.12)
         return VGroup(label, axes, grid, cloud, sigma_block, g_block)
 
     @staticmethod
@@ -567,7 +567,7 @@ class S3Sampler(DeckSlide):
         axes = make_square_axes((0.0, 0.0), half_width, th.PANEL_SWEEP).move_to([-3.75, -0.3, 0])
         # Redrawn from the same z every frame, so the cloud morphs instead of re-randomizing.
         cloud = always_redraw(lambda: self._sweep_cloud(rho.get_value(), axes))
-        pipeline = self._pipeline(rho).move_to([1.95, -0.1, 0])
+        pipeline = self._pipeline(rho).move_to([1.95, 0.15, 0])
         gauge_center = np.array([*th.SWEEP_GAUGE_CENTER, 0])
         gauge = always_redraw(
             lambda: make_pivot_gauge(mm.unit_corr_pivot(rho.get_value()), gauge_center)
@@ -644,11 +644,14 @@ class S3Sampler(DeckSlide):
         # Three lines in a box over the plot, which is empty by now: as one
         # caption line the summary would have to shrink below the minimum size.
         summary = VGroup(
-            th.text("Positive pivots: Cholesky works.", th.BODY_SIZE, th.COLOR_GOOD),
-            th.text("Zero pivot: the data collapses.", th.BODY_SIZE, th.COLOR_WARN),
-            th.text("Negative pivot: the Σ is impossible.", th.BODY_SIZE, th.COLOR_BAD),
+            th.text("Positive pivots: Cholesky works.", th.CAPTION_SIZE, th.COLOR_GOOD),
+            th.text("Zero pivot: the data collapses.", th.CAPTION_SIZE, th.COLOR_WARN),
+            th.text("Negative pivot: the Σ is impossible.", th.CAPTION_SIZE, th.COLOR_BAD),
         ).arrange(DOWN, buff=0.3, aligned_edge=LEFT)
         summary_box = boxed(summary).move_to(axes)
+        # Keep the box on screen even though the plot sits close to the left edge.
+        left_limit = -th.FRAME_WIDTH / 2 + th.EDGE_BUFF
+        summary_box.shift(max(0.0, left_limit - summary_box.get_left()[0]) * RIGHT)
         self.play(FadeOut(caption), FadeIn(summary_box, scale=1.05), run_time=cfg.T_MEDIUM)
         # Freeze the live pieces: an always_redraw mobject rebuilds itself every
         # frame and would ignore the fade-out at the start of the next slide.

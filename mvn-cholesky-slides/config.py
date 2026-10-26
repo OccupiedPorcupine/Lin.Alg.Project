@@ -116,6 +116,7 @@ HERO_GRID_HALF_WIDTH = 2  # the moving grid covers z in [-2, 2]^2; keep mu + G(g
 CONTOUR_KS = [1.0, 2.0]  # k-sigma density contours drawn on slides 1.4 and 3.1
 QUESTION_ELLIPSE_K = 2.0  # k-sigma ellipse drawn around target clouds
 FORMULA_POINT_DISTANCE = 2.0  # slide 1.4: ruler distance of points A and B from mu
+FORMULA_ZOOM_HALF_WIDTH = 4.0  # slide 1.4: the A and B plot shows mu +/- this much
 AXIS_N_SD = 3.5  # axes span mean +/- this many standard deviations
 AXIS_ROUND_STEP = 1.0  # axis limits are rounded outward to a multiple of this
 DISPLAY_DECIMALS = 2  # decimal places for every number shown on screen
