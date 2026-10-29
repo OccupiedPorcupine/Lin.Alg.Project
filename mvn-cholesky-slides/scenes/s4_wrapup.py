@@ -1,8 +1,7 @@
 """Section 4: wrap-up.
 
-Recap, the Gaussian process curves from the hook explained, limits, the
-closing slide, and a backup appendix showing that x = mu + G z also derives
-the density.
+Recap, limits, the closing slide, and two backup appendix slides: x = mu + G z
+also derives the density (A.1), and the eigen view of Sigma (A.2).
 """
 
 import sys
@@ -24,12 +23,15 @@ from components import (
     fmt,
     fmt_vector,
     make_cov_ellipse,
-    make_gp_axes,
-    make_gp_states,
+    fade_in_cloud,
+    make_axes,
     make_histogram,
+    make_labeled_matrix,
     make_pivot_gauge,
     make_point_cloud,
     make_square_axes,
+    panel_dot_radius,
+    swap_caption,
 )
 
 IDENTITY = np.eye(2)
@@ -49,7 +51,7 @@ def dimmed(mobject: Mobject, factor: float) -> Mobject:
 
 
 class S4WrapUp(DeckSlide):
-    """Section 4: recap, the bookend, limits, thanks, and the appendix."""
+    """Section 4: recap, limits, thanks, and the appendix."""
 
     section_number = 4
     section_name = "Wrap-up"
@@ -57,10 +59,10 @@ class S4WrapUp(DeckSlide):
     def construct(self) -> None:
         self.slide_4_0_section()
         self.slide_4_1_recap()
-        self.slide_4_2_bookend()
-        self.slide_4_3_limits()
-        self.slide_4_4_closing()
+        self.slide_4_2_limits()
+        self.slide_4_3_closing()
         self.slide_a_1_derivation()
+        self.slide_a_2_eigen_view()
 
     # --- 4.0 -----------------------------------------------------------------
 
@@ -128,64 +130,13 @@ class S4WrapUp(DeckSlide):
 
     # --- 4.2 -----------------------------------------------------------------
 
-    def slide_4_2_bookend(self) -> None:
-        """Replay of the 1.1 Gaussian process morph. Point: same trick, 60 dimensions."""
-        self.begin_slide(
-            notes=f"""
-            Remember the smooth random curves from the very start? Now we can
-            say exactly what happened. Each jagged row of {cfg.GP_N_POINTS}
-            independent values is z, and multiplying by G, the Cholesky factor
-            of the kernel, mixes neighbouring points together so the curve comes
-            out smooth. It is the same x equals G z, just in {cfg.GP_N_POINTS}
-            dimensions instead of 2.
-            """
-        )
-        title = th.slide_title("The smooth curves, explained")
-        n = cfg.GP_N_POINTS
-        # Several parts (th.math takes one string), so G can be colored on its own.
-        label = MathTex(
-            r"\mathbf{x} = G\mathbf{z},",
-            rf"\quad\text{{where }} G \text{{ is the }} {n} \times {n}"
-            r"\text{ Cholesky factor of the kernel}",
-            substrings_to_isolate=["G"],
-            font_size=th.BODY_SIZE * th.MATH_SCALE,
-            color=th.COLOR_TEXT,
-        )
-        label.set_color_by_tex("G", th.COLOR_G)
-        label[0].set_color(th.COLOR_X)  # "\mathbf{x} =" in the color of correlated samples
-        label.next_to(title, DOWN, buff=th.TITLE_GAP).set_x(0)
-        axes = make_gp_axes().next_to(label, DOWN, buff=0.45)
-        caption = th.caption(f"Same trick, {n} dimensions instead of 2.")
-
-        self.play(FadeIn(title), Create(axes), run_time=cfg.T_SHORT)
-        self.play(FadeIn(label), run_time=cfg.T_MEDIUM)
-        previous = None
-        for z_row, x_row in zip(self.gp_z, self.gp_x, strict=True):
-            start, end = make_gp_states(z_row, x_row, axes)
-            # Dim the previous curve. Stroke and fill separately: set_opacity
-            # would also fill the open curve, painting a grey area under it.
-            fade_previous = (
-                [
-                    previous[0].animate.set_stroke(opacity=th.BOOKEND_DIM_OPACITY),
-                    previous[1].animate.set_fill(opacity=th.BOOKEND_DIM_OPACITY),
-                ]
-                if previous
-                else []
-            )
-            self.play(FadeIn(start), *fade_previous, run_time=cfg.T_SHORT)
-            self.play(Transform(start, end), run_time=cfg.T_LONG)
-            previous = start
-        self.play(FadeIn(caption), run_time=cfg.T_SHORT)
-
-    # --- 4.3 -----------------------------------------------------------------
-
-    def slide_4_3_limits(self) -> None:
+    def slide_4_2_limits(self) -> None:
         """Three limits, each with a callback. Point: know when Cholesky is the wrong tool."""
         self.begin_slide(
             notes="""
             Three limits. First, Cholesky needs every pivot strictly positive;
             at rho equal to 1 the pivot hit zero and it stopped. Second, the
-            eigen square root from the eigen view still works there, because
+            eigen square root (the eigen view, in the appendix) still works there, because
             the square root of a zero eigenvalue is just zero, which is why
             NumPy's multivariate normal uses SVD by default, even though it is
             slower. Third, this only makes Gaussian data, and real returns have
@@ -265,7 +216,7 @@ class S4WrapUp(DeckSlide):
         return row
 
     def _gauge_thumbnail(self) -> VGroup:
-        """Small copy of the 3.4 pivot gauge, frozen at rho = 1 (pivot 0, amber)."""
+        """Small copy of the 3.3 pivot gauge, frozen at rho = 1 (pivot 0, amber)."""
         rho = cfg.RHO_ZERO_PIVOT
         pivot = mm.unit_corr_pivot(rho)
         gauge = make_pivot_gauge(pivot, scale=th.LIMITS_THUMB_SCALE)
@@ -294,13 +245,13 @@ class S4WrapUp(DeckSlide):
         return line
 
     def _eigen_line(self) -> MathTex:
-        """'At rho = 1: lambda = 2 and 0, and sqrt(0) = 0 is fine (from 3.3)'."""
+        """'At rho = 1: lambda = 2 and 0, and sqrt(0) = 0 is fine (appendix)'."""
         values, _ = mm.eigen_axes(mm.correlation_matrix(cfg.RHO_ZERO_PIVOT))
         shown = r" \text{ and } ".join(fmt(v) for v in values)
         return th.math(
             rf"\rho = {fmt(cfg.RHO_ZERO_PIVOT)}:\ \lambda = {shown},"
             rf"\ \sqrt{{{fmt(values[-1])}}} = {fmt(np.sqrt(max(values[-1], 0.0)))}"
-            r"\text{ is fine (eigen view)}",
+            r"\text{ is fine (appendix)}",
             th.CAPTION_SIZE,
             th.COLOR_MUTED,
         )
@@ -329,9 +280,9 @@ class S4WrapUp(DeckSlide):
         tag = th.text("from the start", th.MIN_SIZE, th.COLOR_MUTED).next_to(axes, DOWN, buff=0.1)
         return VGroup(axes, bars, var_line, tag)
 
-    # --- 4.4 -----------------------------------------------------------------
+    # --- 4.3 -----------------------------------------------------------------
 
-    def slide_4_4_closing(self) -> None:
+    def slide_4_3_closing(self) -> None:
         """Thank you and questions."""
         self.begin_slide(
             notes="""
@@ -416,3 +367,214 @@ class S4WrapUp(DeckSlide):
             ),
         ).arrange(DOWN, buff=0.22, aligned_edge=LEFT)
         return boxed(content, buff=0.25)
+
+    # --- A.2 -----------------------------------------------------------------
+
+    def slide_a_2_eigen_view(self) -> None:
+        """Backup: Sigma applied to test arrows, then eigen arrows. Point: read the shape."""
+        self.begin_slide(
+            notes="""
+            Cholesky told us how to build this cloud. Eigenvectors tell us how
+            to read it. Most arrows turn when I multiply them by Sigma, but two
+            directions only stretch: the diagonal by 9 and the other diagonal by
+            1. Their square roots, 3 and 1, are exactly how spread out the cloud
+            is along each axis.
+            """
+        )
+        sigma = np.asarray(cfg.EIGEN_EXAMPLE_SIGMA, dtype=float)
+        title = th.slide_title("Appendix: the eigen view")
+        examples = [sigma]
+        if cfg.ENABLE_EIGEN_SECOND_EXAMPLE:
+            examples.append(np.asarray(cfg.EIGEN_EXAMPLE_SIGMA_2, dtype=float))
+        half_width = mm.shared_half_width(examples, cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
+        axes = make_square_axes((0.0, 0.0), half_width, th.EIGEN_PANEL).move_to([-3.75, -0.3, 0])
+        # Morphs between the two examples by interpolating Sigma; every in-between
+        # matrix is positive definite, so Cholesky works on each frame.
+        blend = ValueTracker(0.0)
+
+        def current_sigma() -> np.ndarray:
+            return (1 - blend.get_value()) * examples[0] + blend.get_value() * examples[-1]
+
+        cloud = make_point_cloud(
+            mm.transform(self.z_display, np.zeros(2), mm.cholesky_factor(sigma)),
+            axes,
+            th.COLOR_X,
+            panel_dot_radius(th.EIGEN_PANEL),
+        )
+        sigma_block = make_labeled_matrix(r"\Sigma", sigma, th.COLOR_SIGMA, th.CAPTION_SIZE)
+        sigma_block.move_to([0.0, 2.35, 0]).set_x(-0.6, direction=LEFT)
+        question = th.caption("Which directions does this cloud stretch along, and by how much?")
+
+        self.play(FadeIn(title), Create(axes), FadeIn(sigma_block), run_time=cfg.T_SHORT)
+        self.play(fade_in_cloud(cloud), FadeIn(question), run_time=cfg.T_MEDIUM)
+        self.reveal()
+
+        tests = self._direction_tests(sigma, sigma_block, question)
+        self.reveal()
+
+        self.play(FadeOut(tests), run_time=cfg.T_SHORT)
+        ellipse = always_redraw(
+            lambda: make_cov_ellipse(current_sigma(), (0.0, 0.0), cfg.EIGEN_ARROW_K, axes)
+        )
+        arrows = always_redraw(lambda: self._eigen_arrows(current_sigma(), axes))
+        rows = self._eigen_rows(sigma).next_to(sigma_block, DOWN, buff=0.6, aligned_edge=LEFT)
+        roots = np.sqrt(mm.eigen_axes(sigma)[0])
+        caption = th.caption(
+            "Eigenvectors set the ellipse's axes. √eigenvalues set the spread: "
+            f"{fmt(roots[0])} one way, {fmt(roots[1])} the other."
+        )
+        self.play(Create(ellipse), run_time=cfg.T_MEDIUM)
+        self.play(
+            GrowFromPoint(arrows, axes.c2p(0, 0)),
+            FadeIn(rows),
+            swap_caption(self.eigen_caption, caption),
+            run_time=cfg.T_MEDIUM,
+        )
+
+        if cfg.ENABLE_EIGEN_SECOND_EXAMPLE:
+            self.reveal()
+            second = examples[-1]
+            live_cloud = always_redraw(
+                lambda: make_point_cloud(
+                    mm.transform(self.z_display, np.zeros(2), mm.cholesky_factor(current_sigma())),
+                    axes,
+                    th.COLOR_X,
+                    panel_dot_radius(th.EIGEN_PANEL),
+                )
+            )
+            self.remove(cloud)
+            self.add(live_cloud, ellipse, arrows)
+            new_block = make_labeled_matrix(r"\Sigma", second, th.COLOR_SIGMA, th.CAPTION_SIZE)
+            new_block.move_to(sigma_block, aligned_edge=LEFT)
+            new_rows = self._eigen_rows(second).move_to(rows, aligned_edge=UL)
+            new_values = mm.eigen_axes(second)[0]
+            new_caption = th.caption(
+                f"Not just a 45° trick: eigenvalues {fmt(new_values[0])} and "
+                f"{fmt(new_values[1])}, so spreads {fmt(np.sqrt(new_values[0]))} "
+                f"and {fmt(np.sqrt(new_values[1]))}."
+            )
+            self.play(
+                blend.animate.set_value(1.0),
+                Transform(sigma_block, new_block),
+                Transform(rows, new_rows),
+                swap_caption(caption, new_caption),
+                run_time=cfg.T_LONG,
+            )
+            # Not a frozen frame: rerun the updaters so everything shows the exact final Sigma.
+            self.wait(cfg.T_SETTLE, frozen_frame=False)
+            for live in (live_cloud, ellipse, arrows):
+                live.clear_updaters()
+
+    def _direction_tests(self, sigma: np.ndarray, anchor: Mobject, question: Mobject) -> VGroup:
+        """Apply Sigma to each test direction on a small plane, one click per direction.
+
+        Returns everything it drew, so the caller can clear it. Leaves the
+        current caption in ``self.eigen_caption``.
+        """
+        images = [sigma @ np.asarray(v) for v in cfg.EIGEN_TEST_DIRECTIONS]
+        coords = np.concatenate([np.asarray(cfg.EIGEN_TEST_DIRECTIONS), images])
+        low = float(np.floor(min(coords.min(), 0.0))) - 1
+        high = float(np.ceil(coords.max())) + 1
+        plane = make_axes((low, high), (low, high), th.EIGEN_TEST_PANEL, th.EIGEN_TEST_PANEL)
+        plane.move_to([*th.EIGEN_TEST_CENTER, 0])
+        plane_label = th.math(r"\text{multiply by }\Sigma", th.MIN_SIZE, th.COLOR_SIGMA)
+        plane_label.next_to(plane, UP, buff=0.1)
+        readouts = VGroup()
+        drawn = VGroup(plane, plane_label, readouts)
+        self.play(Create(plane), FadeIn(plane_label), run_time=cfg.T_SHORT)
+
+        captions = [
+            "Most directions get rotated.",
+            "This one only stretches.",
+            "And so does this one.",
+        ]
+        caption = question
+        previous = VGroup()
+        for index, (vector, image) in enumerate(
+            zip(cfg.EIGEN_TEST_DIRECTIONS, images, strict=True)
+        ):
+            if index > 0:
+                self.reveal()
+            vector = np.asarray(vector)
+            before = Arrow(plane.c2p(0, 0), plane.c2p(*vector), buff=0, color=th.COLOR_TEXT)
+            after = Arrow(plane.c2p(0, 0), plane.c2p(*image), buff=0, color=th.COLOR_SIGMA)
+            for arrow in (before, after):
+                arrow.set_stroke(width=5)
+            readout = th.math(self._readout_tex(vector, image), th.CAPTION_SIZE)
+            if readouts:
+                readout.next_to(readouts, DOWN, buff=0.3, aligned_edge=LEFT)
+            else:
+                # Below the test plane's top edge would collide with it, so the
+                # readouts start low on the slide, under the Sigma matrix's column.
+                readout.move_to([0, th.EIGEN_READOUT_Y, 0]).align_to(anchor, LEFT)
+            readouts.add(readout)
+            new_caption = th.caption(captions[min(index, len(captions) - 1)])
+            self.play(
+                previous.animate.set_opacity(0.3),
+                GrowArrow(before),
+                FadeIn(readout),
+                swap_caption(caption, new_caption),
+                run_time=cfg.T_SHORT,
+            )
+            self.play(TransformFromCopy(before, after), run_time=cfg.T_MEDIUM)
+            previous = VGroup(before, after)
+            drawn.add(previous)
+            caption = new_caption
+        self.reveal()
+        key = th.math(r"\Sigma\mathbf{v} = \lambda\mathbf{v}", th.BODY_SIZE, th.COLOR_SIGMA)
+        key_box = SurroundingRectangle(key, color=th.COLOR_SIGMA, buff=0.15)
+        VGroup(key, key_box).to_edge(RIGHT, buff=th.EDGE_BUFF).match_y(readouts)
+        key_caption = th.caption(
+            "Directions Σ only stretches: <b>eigenvectors</b>. "
+            "The stretch factors: <b>eigenvalues</b>."
+        )
+        self.play(
+            Write(key),
+            Create(key_box),
+            swap_caption(caption, key_caption),
+            run_time=cfg.T_MEDIUM,
+        )
+        drawn.add(key, key_box)
+        self.eigen_caption = key_caption
+        return drawn
+
+    @staticmethod
+    def _readout_tex(vector: np.ndarray, image: np.ndarray) -> str:
+        """'Sigma (1, 1) = (9, 9) = 9 (1, 1)' if the image is parallel, else 'Sigma v = image'."""
+        tex = rf"\Sigma {fmt_vector(vector)} = {fmt_vector(image)}"
+        cross = vector[0] * image[1] - vector[1] * image[0]
+        if abs(cross) < 1e-9:
+            factor = float(image @ vector / (vector @ vector))
+            tex += rf" = {fmt(factor)} \cdot {fmt_vector(vector)}"
+        return tex
+
+    @staticmethod
+    def _eigen_arrows(sigma: np.ndarray, axes: Axes) -> VGroup:
+        """Both eigenvectors from the center, scaled by k sqrt(lambda), labeled at the tips."""
+        values, vectors = mm.eigen_axes(sigma)
+        group = VGroup()
+        for index, (value, vector) in enumerate(zip(values, vectors.T, strict=True), start=1):
+            tip = cfg.EIGEN_ARROW_K * np.sqrt(value) * vector
+            arrow = Arrow(axes.c2p(0, 0), axes.c2p(*tip), buff=0, color=th.COLOR_TEXT)
+            arrow.set_stroke(width=6)
+            label = th.math(rf"\mathbf{{v}}_{index}", th.CAPTION_SIZE)
+            label.add_background_rectangle(color=th.BACKGROUND, opacity=0.85, buff=0.05)
+            label.next_to(axes.c2p(*tip), normalize(arrow.get_vector()), buff=0.12)
+            group.add(VGroup(arrow, label))
+        return group
+
+    @staticmethod
+    def _eigen_rows(sigma: np.ndarray) -> VGroup:
+        """One row per eigenpair: lambda, its square root, and the unit eigenvector."""
+        values, vectors = mm.eigen_axes(sigma)
+        rows = VGroup(
+            *[
+                th.math(
+                    rf"\lambda_{i} = {fmt(value)},\ \sqrt{{\lambda_{i}}} = {fmt(np.sqrt(value))},"
+                    rf"\ \mathbf{{v}}_{i} \approx {fmt_vector(vector, fixed=True)}",
+                    th.CAPTION_SIZE,
+                )
+                for i, (value, vector) in enumerate(zip(values, vectors.T, strict=True), start=1)
+            ]
+        )
+        return rows.arrange(DOWN, buff=0.35, aligned_edge=LEFT)

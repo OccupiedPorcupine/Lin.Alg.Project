@@ -1,6 +1,6 @@
 """Reusable Manim builders: axes, point clouds, ellipses, matrices, panels, marks,
-plus the pieces shared between sections (Gaussian process curves, histograms,
-the pivot gauge and the hero frame).
+plus the pieces shared between sections (histograms, the pivot gauge and the
+hero frame).
 
 Also holds ``DeckSlide``, the shared base class that gives every section the
 same section slide, speaker-note handling and slide-to-slide transition.
@@ -350,64 +350,7 @@ def make_dim_overlay(opacity: float = 0.85) -> FullScreenRectangle:
     return overlay.set_fill(th.BACKGROUND, opacity=opacity).set_stroke(width=0)
 
 
-# --- Gaussian process panel (1.1, replayed on 4.2) --------------------------------
-
-
-def make_gp_axes() -> Axes:
-    """Axes for the Gaussian process curves: x over GP_X_RANGE, y over N(0, 1) values.
-
-    The y range holds standard normal draws out to AXIS_N_SD, so the jagged
-    dots (which are N(0, 1)) never leave the axes, and neither do the curves.
-    """
-    y_lim = mm.axis_limits_1d([0.0], [1.0], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
-    return Axes(
-        x_range=[cfg.GP_X_RANGE[0], cfg.GP_X_RANGE[1], 1],
-        y_range=[y_lim[0], y_lim[1], 1],
-        x_length=th.GP_WIDTH,
-        y_length=th.GP_HEIGHT,
-        tips=False,
-        axis_config={"color": th.COLOR_MUTED, "stroke_width": th.AXIS_STROKE},
-        x_axis_config={"include_ticks": False},
-        y_axis_config={"include_ticks": False},
-    )
-
-
-def gp_points(values: np.ndarray, axes: Axes) -> list[np.ndarray]:
-    """Screen positions of one curve's values at the GP grid's x positions."""
-    xs = mm.gp_grid(cfg.GP_X_RANGE, cfg.GP_N_POINTS)
-    return [axes.c2p(x, y) for x, y in zip(xs, values, strict=True)]
-
-
-def make_gp_dots(values: np.ndarray, axes: Axes, color: str = th.COLOR_Z) -> VGroup:
-    """One dot per grid point: the 60 values of one draw, before or after G."""
-    return VGroup(*[Dot(p, radius=th.GP_DOT_RADIUS, color=color) for p in gp_points(values, axes)])
-
-
-def make_gp_jagged_line(values: np.ndarray, axes: Axes, color: str = th.COLOR_Z) -> VMobject:
-    """Straight segments joining the dots, which shows how jagged independent draws are."""
-    line = VMobject().set_points_as_corners(gp_points(values, axes))
-    return line.set_stroke(color, width=2, opacity=0.6)
-
-
-def make_gp_curve(values: np.ndarray, axes: Axes, color: str = th.COLOR_X) -> VMobject:
-    """A smooth curve through the values (used for x = G z, which is smooth)."""
-    curve = VMobject().set_points_smoothly(gp_points(values, axes))
-    return curve.set_stroke(color, width=5)
-
-
-def make_gp_states(z_row: np.ndarray, x_row: np.ndarray, axes: Axes) -> tuple[VGroup, VGroup]:
-    """Start and end states of one jagged-to-smooth morph: Transform(start, end).
-
-    Start: the 60 independent values z (blue dots joined by a faint jagged
-    line). End: the same dots moved to x = G z (orange) on a smooth curve.
-    Slides 1.1 and 4.2 both animate exactly this, so 4.2 is a true replay.
-    """
-    start = VGroup(make_gp_jagged_line(z_row, axes), make_gp_dots(z_row, axes, th.COLOR_Z))
-    end = VGroup(make_gp_curve(x_row, axes), make_gp_dots(x_row, axes, th.COLOR_X))
-    return start, end
-
-
-# --- Histograms (1.1 portfolio panel, 4.3 thumbnail) --------------------------------
+# --- Histograms (1.1 portfolio panel, 4.2 thumbnail) --------------------------------
 
 
 def make_histogram(
@@ -430,7 +373,7 @@ def make_histogram(
     return bars.set_fill(color, opacity).set_stroke(color, width=1.5, opacity=0.9)
 
 
-# --- Pivot gauge (3.4, thumbnail on 4.3) ------------------------------------------------
+# --- Pivot gauge (3.3, thumbnail on 4.2) ------------------------------------------------
 
 
 def pivot_color(pivot: float) -> str:
@@ -471,7 +414,7 @@ def make_pivot_gauge(pivot: float, center: np.ndarray = ORIGIN, scale: float = 1
     return VGroup(frame, zero_line, bar, labels)
 
 
-# --- Hero frame (2.5 ends on it, 3.1 starts from it) ---------------------------------
+# --- Hero frame (2.4 ends on it, 3.1 starts from it) ---------------------------------
 
 HERO_NUMPY_SNIPPET = """\
 G = np.linalg.cholesky(Sigma)
@@ -560,9 +503,9 @@ def make_hero_code() -> VGroup:
 
 
 class HeroFrame(VGroup):
-    """The last frame of slide 2.5, rebuilt from scratch.
+    """The last frame of slide 2.4, rebuilt from scratch.
 
-    Slide 2.5 animates its way to this state; Section 3 opens by adding it
+    Slide 2.4 animates its way to this state; Section 3 opens by adding it
     instantly, so the orange cloud carries across the section boundary. Both
     use this class, so the two frames cannot drift apart. Draw order is the
     order of the submobjects: plane, grid, cloud, marker, label, guides, code.
@@ -646,12 +589,6 @@ class DeckSlide(Slide):
         self.z_stats = mm.standard_normal_samples(cfg.N_STATS, 2, cfg.RANDOM_SEED)
         self.z_display = self.z_stats[: cfg.N_DISPLAY]
         self.main_chol = mm.cholesky_factor(cfg.MAIN_SIGMA)  # G for the main example
-        # Gaussian process draws: each row of gp_z is 60 independent values and
-        # the same row of gp_x is the smooth curve G z. Sections 1 and 4 both
-        # use these, so 4.2 replays exactly the curves of 1.1.
-        gp_xs = mm.gp_grid(cfg.GP_X_RANGE, cfg.GP_N_POINTS)
-        self.gp_z = mm.standard_normal_samples(cfg.GP_N_CURVES, cfg.GP_N_POINTS, cfg.RANDOM_SEED)
-        self.gp_x = mm.gp_curves(self.gp_z, gp_xs, cfg.GP_LENGTH_SCALE, cfg.GP_JITTER)
 
     def begin_slide(self, notes: str) -> None:
         """Start a new slide.

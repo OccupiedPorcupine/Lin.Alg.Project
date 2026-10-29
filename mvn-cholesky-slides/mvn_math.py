@@ -8,7 +8,7 @@ Conventions:
     * Because of that, the column-vector formula x = mu + G z becomes
       X = mu + Z @ G.T when applied to every row at once.
     * G always means the Cholesky factor (lower triangular, G G^T = Sigma).
-      L only means the unit lower triangular factor from elimination (2.4).
+      L only means the unit lower triangular factor from elimination (2.3a to 2.3d).
 """
 
 from __future__ import annotations
@@ -93,7 +93,7 @@ def cholesky_factor(sigma: ArrayLike) -> Array:
 
 
 def cholesky_manual(sigma: ArrayLike) -> Array:
-    """Teaching version of Cholesky, entry by entry (the formulas on slide 2.4e).
+    """Teaching version of Cholesky, entry by entry: the column-by-column formulas.
 
     Column j is filled top to bottom:
         g_jj = sqrt(sigma_jj - sum_{k<j} g_jk^2)
@@ -116,22 +116,6 @@ def cholesky_manual(sigma: ArrayLike) -> Array:
     return chol
 
 
-def triangle_solve_2x2(sigma: ArrayLike) -> tuple[float, float, float]:
-    """Solve A A^T = Sigma for A = [[a, 0], [c, d]] (slide 2.3).
-
-    Forcing the top-right entry b to 0 turns the three equations
-        a^2 + b^2 = sigma_11,  ac + bd = sigma_21,  c^2 + d^2 = sigma_22
-    into a chain that solves one unknown at a time: a, then c, then d.
-    """
-    sigma = np.asarray(sigma, dtype=float)
-    a = math.sqrt(sigma[0, 0])
-    c = sigma[1, 0] / a
-    d_sq = sigma[1, 1] - c**2
-    if d_sq <= 0:
-        raise NotPositiveDefiniteError("Sigma is not positive definite.")
-    return a, c, math.sqrt(d_sq)
-
-
 @dataclass(frozen=True)
 class EliminationStep:
     """One row operation R_target <- R_target - multiplier * R_source (rows 0-based)."""
@@ -144,7 +128,7 @@ class EliminationStep:
 
 @dataclass(frozen=True)
 class LDLSteps:
-    """The full hand route of slide 2.4: LU, then LDV, then LDL^T, then G G^T."""
+    """The full hand route of slides 2.3a to 2.3d: LU, then LDV, then LDL^T, then G G^T."""
 
     steps: list[EliminationStep]
     lower: Array  # L: unit lower triangular, holds the multipliers
@@ -190,52 +174,7 @@ def ldl_steps(sigma: ArrayLike) -> LDLSteps:
     )
 
 
-@dataclass(frozen=True)
-class CholeskyEntry:
-    """One entry of G from the direct solve on slide 2.4e (indices 0-based).
-
-    Diagonal:  value = sqrt(sigma_entry - sum(subtracted))
-    Below:     value = (sigma_entry - sum(subtracted)) / divisor
-    ``subtracted`` lists the products g_ik g_jk (k < j) already known.
-    """
-
-    row: int
-    col: int
-    sigma_entry: float
-    subtracted: list[float]
-    divisor: float | None  # g_jj for entries below the diagonal, None on the diagonal
-    value: float
-
-    @property
-    def is_diagonal(self) -> bool:
-        return self.row == self.col
-
-
-def cholesky_direct_steps(sigma: ArrayLike) -> list[CholeskyEntry]:
-    """Every g_ij in the order slide 2.4e solves them: column by column, top down."""
-    sigma = np.asarray(sigma, dtype=float)
-    size = sigma.shape[0]
-    chol = np.zeros_like(sigma)
-    entries = []
-    for j in range(size):
-        for i in range(j, size):
-            subtracted = [float(chol[i, k] * chol[j, k]) for k in range(j)]
-            remaining = sigma[i, j] - sum(subtracted)
-            if i == j:
-                if remaining <= 0:
-                    raise NotPositiveDefiniteError("Sigma is not positive definite.")
-                chol[i, j] = math.sqrt(remaining)
-                divisor = None
-            else:
-                divisor = float(chol[j, j])
-                chol[i, j] = remaining / divisor
-            entries.append(
-                CholeskyEntry(i, j, float(sigma[i, j]), subtracted, divisor, float(chol[i, j]))
-            )
-    return entries
-
-
-# --- Unit-variance correlation (slide 3.4) -------------------------------------
+# --- Unit-variance correlation (slide 3.3) -------------------------------------
 
 
 def correlation_matrix(rho: float) -> Array:
@@ -350,35 +289,7 @@ def normal_pdf_1d(x: ArrayLike, mu: float, sd: float) -> Array:
     return np.exp(-0.5 * ((x - mu) / sd) ** 2) / (sd * math.sqrt(2.0 * math.pi))
 
 
-# --- Applications (slides 1.1 and 4.2) -------------------------------------------
-
-
-def rbf_kernel(xs: ArrayLike, length_scale: float) -> Array:
-    """Gaussian process covariance: k(x, x') = exp(-(x - x')^2 / (2 l^2)).
-
-    Points close together get covariance near 1 (they move together), far
-    apart near 0. Without a small jitter on the diagonal this matrix is
-    numerically singular, so plain Cholesky fails on it.
-    """
-    xs = np.asarray(xs, dtype=float)
-    gaps = xs[:, None] - xs[None, :]
-    return np.exp(-0.5 * (gaps / length_scale) ** 2)
-
-
-def gp_grid(x_range: tuple[float, float], n_points: int) -> Array:
-    """The evenly spaced x positions of the Gaussian process panel."""
-    return np.linspace(x_range[0], x_range[1], n_points)
-
-
-def gp_curves(z: ArrayLike, xs: ArrayLike, length_scale: float, jitter: float) -> Array:
-    """Smooth random curves x = G z, one per row of ``z``.
-
-    G is the Cholesky factor of the RBF kernel plus jitter. Each row of z is
-    60 independent jagged values; each output row is the smooth curve they
-    become. The same z gives the same curves, which is how 4.2 replays 1.1.
-    """
-    kernel = rbf_kernel(xs, length_scale) + jitter * np.eye(len(np.asarray(xs)))
-    return transform(z, np.zeros(kernel.shape[0]), cholesky_factor(kernel))
+# --- Application: portfolio risk (1.1, thumbnail on 4.2) ---------------------
 
 
 def portfolio_returns(weights: ArrayLike, rho: float, n: int, seed: int) -> Array:

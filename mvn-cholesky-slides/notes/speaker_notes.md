@@ -14,7 +14,7 @@ Let's start with the problem. We will see where correlated randomness matters, w
 
 ### 1.1  Hook
 
-Before any math, here are three places where correlated randomness matters. A bank simulating a portfolio underestimates its risk if it treats the stocks as independent. A random smooth curve is really one draw from a 60 dimensional normal, and synthetic data is only useful if it keeps the real correlations. All three need random numbers that move together.
+Before any math, here are two places where correlated randomness matters. A bank simulating a portfolio underestimates its risk if it treats the stocks as independent, and synthetic data is only useful if it keeps the real correlations. Both need random numbers that move together.
 
 ### 1.2  What computers give us
 
@@ -50,37 +50,29 @@ Now the solution. We will work out what a matrix does to the spread of the data,
 
 Let's name our characters. z is the random point we start with, A is the matrix we multiply by, and x is the point we get out. Each new variable is a mix of z₁ and z₂, independent spreads add, and covariance only comes from shared ingredients. Put those in a matrix and it's exactly A times A transpose, the nD version of 'scaling by a multiplies variance by a²'. So the real question is: what A gives A Aᵀ = Σ?
 
-### 2.2  Many square roots
+### 2.2  The plan: Cholesky decomposition
 
-So a square root of Σ means any matrix A with A A transpose equal to Σ, just like σ times σ is σ² in one dimension. But it is not unique. If we rotate the round cloud first, it still looks exactly the same, so A times any rotation Q works too. We need a rule to pick one.
+A A transpose equals Σ gives three equations, but there are four unknowns, so we get one free choice. Cholesky's choice is to make A lower triangular, and we call that matrix G. Here is the plan for finding it: eliminate to get L U, pull the pivots out into D, use symmetry to get L D L transpose, then split D in half. Next we do each step by hand on a 3 by 3. If anyone asks: with a positive diagonal G is unique, and it costs about n cubed over 3 operations.
 
-### 2.3  The rule: force a triangle
-
-Here is the rule. Force the top-right entry of A to zero, and the three equations untangle: the first gives a, then the third gives c, then the second gives d. That triangular A is the Cholesky factor, and from now on we call it G. It is unique, it exists exactly when Σ is positive definite, and it is fast. And note the test is G times G transpose, not G times G.
-
-### 2.4a  By hand, step 1: LU (ordinary elimination)
+### 2.3a  By hand, step 1: LU (ordinary elimination)
 
 We already know how to factor a matrix: Gaussian elimination. Each step subtracts a multiple of one row from another. We record those multipliers in L, and what's left is U.
 
-### 2.4b  Step 2: LDV (pull the pivots out)
+### 2.3b  Step 2: LDV (pull the pivots out)
 
 U's diagonal holds the pivots. If we pull them out into a diagonal matrix D, we get L D V.
 
-### 2.4c  Step 3: LDLᵀ (symmetry gives V for free)
+### 2.3c  Step 3: LDLᵀ (symmetry gives V for free)
 
 Because Σ is symmetric, V turns out to be exactly L transposed. So Σ = L D Lᵀ.
 
-### 2.4d  Step 4: split D in half, giving G Gᵀ
+### 2.3d  Step 4: split D in half, giving G Gᵀ
 
 Now the trick: split D into two square roots and give one to each side. L √D is our G, and Σ = G Gᵀ. That's Cholesky. It needs every pivot to be strictly positive, which is exactly the positive definite condition.
 
-### 2.4e  The shortcut: solve for G directly
+### 2.4  The algorithm
 
-In practice, you skip the detour and solve for G directly, column by column. Same numbers, and the general formula is just that pattern written down.
-
-### 2.5  The algorithm
-
-Back to our 2 by 2, where G is 2, 0, 1, 2. The whole algorithm is four lines: choose μ and Σ, factor Σ, draw independent normals, and compute μ plus G z. Watch the grid: G shears the whole plane, the circle becomes an ellipse, and then everything shifts by μ. Our tracked point lands exactly at 2, 0.5, and in NumPy it is three lines.
+Back to our 2 by 2. Its Σ is the top-left corner of the 3 by 3, so its G is the top-left corner of the G we just found: 2, 0, 1, 2. The whole algorithm is four lines: choose μ and Σ, factor Σ, draw independent normals, and compute μ plus G z. Watch the grid: G shears the whole plane, the circle becomes an ellipse, and then everything shifts by μ. Our tracked point lands exactly at 2, 0.5, and in NumPy it is three lines.
 
 ## S3Sampler
 
@@ -90,23 +82,19 @@ The sampler is built, so let's put it to work. This section is part b of the bri
 
 ### 3.1  Does it work?
 
-We built a sampler, but does it really produce the Sigma we asked for? Measured from 20,000 samples, the mean and covariance match the targets to about two decimal places, and the dots fill the 1 and 2 sigma contours just as the density predicts. The 3 by 3 G we computed by hand in 2.4 passes the same test.
+We built a sampler, but does it really produce the Sigma we asked for? Measured from 20,000 samples, the mean and covariance match the targets to about two decimal places, and the dots fill the 1 and 2 sigma contours just as the density predicts. The 3 by 3 G we computed by hand in 2.3 passes the same test.
 
 ### 3.2  Turning the dial
 
 Now we trust the machine, so let's feed it different Sigmas. Every panel starts from exactly the same z, so the only thing changing is G. The identity does nothing, a diagonal G stretches each axis by a square root, and an off-diagonal entry shears the grid and tilts the cloud one way or the other.
 
-### 3.3  The eigen view
+### 3.3  Turning the dial until it breaks
 
-Cholesky told us how to build this cloud. Eigenvectors tell us how to read it. Most arrows turn when I multiply them by Sigma, but two directions only stretch: the diagonal by 9 and the other diagonal by 1. Their square roots, 3 and 1, are exactly how spread out the cloud is along each axis.
-
-### 3.4  Turning the dial until it breaks
-
-Let's run the same machine from 2.4 while turning rho up. Elimination leaves a second pivot of 1 minus rho squared, and its square root is the only entry in G that gives the cloud any thickness. At exactly rho equals 1 the pivot hits zero, x2 is just a copy of x1, and NumPy refuses to factor it. Push past 1 and the pivot goes negative: there's no square root at all, because no real data could have that covariance.
+Let's run the same machine from 2.3 while turning rho up. Elimination leaves a second pivot of 1 minus rho squared, and its square root is the only entry in G that gives the cloud any thickness. At exactly rho equals 1 the pivot hits zero, x2 is just a copy of x1, and NumPy refuses to factor it. Push past 1 and the pivot goes negative: there's no square root at all, because no real data could have that covariance.
 
 ## S3bThreeD
 
-### 3.5  Bonus: the same recipe in 3D
+### 3.4  Bonus: the same recipe in 3D
 
 The same recipe works in any dimension. Here is the 3 by 3 Sigma from our hand calculation, factored with Cholesky and applied to 3D standard normals. As the camera moves, you can see the cloud is a tilted ellipsoid.
 
@@ -120,18 +108,18 @@ To finish, a quick recap, a second look at the smooth curves from the start, and
 
 To recap: we start from independent noise that any computer can produce, factor our chosen Sigma into G times G transpose, and apply x equals mu plus G z. The result has exactly the correlation structure we asked for.
 
-### 4.2  The smooth curves, explained
+### 4.2  Limits
 
-Remember the smooth random curves from the very start? Now we can say exactly what happened. Each jagged row of 60 independent values is z, and multiplying by G, the Cholesky factor of the kernel, mixes neighbouring points together so the curve comes out smooth. It is the same x equals G z, just in 60 dimensions instead of 2.
+Three limits. First, Cholesky needs every pivot strictly positive; at rho equal to 1 the pivot hit zero and it stopped. Second, the eigen square root (the eigen view, in the appendix) still works there, because the square root of a zero eigenvalue is just zero, which is why NumPy's multivariate normal uses SVD by default, even though it is slower. Third, this only makes Gaussian data, and real returns have fat tails, but the usual fixes, like multivariate t and Gaussian copulas, still get their correlation from the same x equals mu plus G z.
 
-### 4.3  Limits
-
-Three limits. First, Cholesky needs every pivot strictly positive; at rho equal to 1 the pivot hit zero and it stopped. Second, the eigen square root from the eigen view still works there, because the square root of a zero eigenvalue is just zero, which is why NumPy's multivariate normal uses SVD by default, even though it is slower. Third, this only makes Gaussian data, and real returns have fat tails, but the usual fixes, like multivariate t and Gaussian copulas, still get their correlation from the same x equals mu plus G z.
-
-### 4.4  Closing
+### 4.3  Closing
 
 Thank you for listening. We are happy to take any questions, and we can jump back to any slide if it helps.
 
 ### A.1  Appendix: the derivation is the same transformation
 
 A backup slide, in case anyone asks where the density formula comes from. If we run x equals mu plus G z backwards with the change of variables formula, the determinant of G gives the square root of the determinant of Sigma, and the squared length of z becomes the quadratic form. That is exactly the density from slide 1.4, and at our worked point both sides give the same numbers.
+
+### A.2  Appendix: the eigen view
+
+Cholesky told us how to build this cloud. Eigenvectors tell us how to read it. Most arrows turn when I multiply them by Sigma, but two directions only stretch: the diagonal by 9 and the other diagonal by 1. Their square roots, 3 and 1, are exactly how spread out the cloud is along each axis.

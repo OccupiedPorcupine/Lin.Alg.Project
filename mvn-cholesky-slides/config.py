@@ -27,14 +27,6 @@ PORTFOLIO_RHO_CORRELATED = 0.8  # the realistic, correlated stocks (orange)
 VAR_LEVEL = 0.05  # 5% worst-case loss line (Value at Risk)
 PORTFOLIO_HIST_BINS = 36  # bars in each histogram of portfolio returns
 
-# --- 1.1 hook: Gaussian process panel (replayed on 4.2) ----------------------
-
-GP_N_POINTS = 60  # points along the x axis; one curve is one 60-dimensional normal draw
-GP_X_RANGE = (0.0, 10.0)  # x range the curve is drawn over
-GP_LENGTH_SCALE = 1.0  # how far apart two points can be and still move together
-GP_JITTER = 1e-6  # added to the kernel diagonal; Cholesky fails without it
-GP_N_CURVES = 3  # how many jagged-to-smooth morphs are shown
-
 # --- 1.1 hook: synthetic data panel (illustrative "original" correlation) ----
 
 SYNTH_VARIABLES = ["Math", "Physics", "English"]  # column names of the fake exam table
@@ -93,7 +85,7 @@ DEMO_CAPTIONS = [
 ]
 DEMO_GRID_HALF_WIDTH = 3  # the faint grid G deforms in each 3.2 panel covers z in [-3, 3]^2
 
-# --- 3.3 eigen view ----------------------------------------------------------
+# --- Appendix A.2 eigen view ----------------------------------------------------------
 
 EIGEN_EXAMPLE_SIGMA = [[5.0, 4.0], [4.0, 5.0]]  # eigenvalues 9 and 1
 EIGEN_EXAMPLE_SIGMA_2 = [[8.0, 2.0], [2.0, 5.0]]  # eigenvalues 9 and 4
@@ -101,7 +93,7 @@ EIGEN_TEST_DIRECTIONS = [[1.0, 0.0], [1.0, 1.0], [1.0, -1.0]]  # arrows multipli
 ENABLE_EIGEN_SECOND_EXAMPLE = True  # reveal 4: morph to EIGEN_EXAMPLE_SIGMA_2
 EIGEN_ARROW_K = 2.0  # eigenvector arrows are scaled by k * sqrt(lambda)
 
-# --- 3.4 correlation sweep until it breaks -----------------------------------
+# --- 3.3 correlation sweep until it breaks -----------------------------------
 
 RHO_SWEEP_PATH = [0.0, -0.9, 0.0, 0.99, 0.999]  # values visited in order
 RHO_SWEEP_SECONDS_PER_LEG = 6.0 / SPEED_UP  # seconds spent moving between two values
@@ -110,9 +102,8 @@ RHO_NEGATIVE_PIVOT = 1.2  # the pivot is negative here: no such data exists
 ENABLE_NEGATIVE_PIVOT_REVEAL = True  # show the rho = 1.2 step
 SWEEP_DECIMALS = 3  # live readouts need 3 places so 0.999 does not show as 1.00
 
-# --- 2.2 rotation and 2.5 hero animation -------------------------------------
+# --- 2.4 hero animation -------------------------------------
 
-ROTATION_DEMO_DEGREES = 90.0  # how far the round cloud is rotated on slide 2.2
 HERO_GRID_HALF_WIDTH = 2  # the moving grid covers z in [-2, 2]^2; keep mu + G(grid) on the axes
 
 # --- Ellipses and axes -------------------------------------------------------
@@ -126,9 +117,9 @@ AXIS_ROUND_STEP = 1.0  # axis limits are rounded outward to a multiple of this
 DISPLAY_DECIMALS = 2  # decimal places for every number shown on screen
 DENSITY_DECIMALS = 4  # the density value in the appendix is small, so it gets more places
 
-# --- Optional 3D bonus (slide 3.5) -------------------------------------------
+# --- Optional 3D bonus (slide 3.4) -------------------------------------------
 
-ENABLE_3D_BONUS = False  # optional stretch slide, see 3.5; uses EXAMPLE_3X3_SIGMA
+ENABLE_3D_BONUS = False  # optional stretch slide, see 3.4; uses EXAMPLE_3X3_SIGMA
 N_DISPLAY_3D = 400  # 3D dots are spheres, much slower to draw than 2D dots
 THREE_D_ROTATION_DEGREES = 120.0  # how far the camera orbits
 THREE_D_ROTATION_SECONDS = 16.0 / SPEED_UP  # duration of the slow camera rotation

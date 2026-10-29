@@ -29,14 +29,11 @@ from components import (
     fmt_vector,
     make_check_mark,
     make_cross_mark,
-    make_cov_ellipse,
     make_dim_overlay,
     make_hero_grid,
     make_labeled_matrix,
-    make_matrix,
     make_point_cloud,
     make_point_label,
-    make_square_axes,
     make_symbolic_matrix,
     make_worked_marker,
     sqrt_tex,
@@ -45,7 +42,7 @@ from components import (
 )
 
 IDENTITY = np.eye(2)
-GENERAL_A = [["a", "b"], ["c", "d"]]  # the general 2x2 matrix of slides 2.1 to 2.3
+GENERAL_A = [["a", "b"], ["c", "d"]]  # the general 2x2 matrix of slides 2.1 and 2.2
 # The one exact symbolic value in the deck: the off-diagonal of A A^T for the
 # element-wise root of MAIN_SIGMA. tests/test_mvn_math.py checks it numerically.
 SQRT_ATTEMPT_COV_TEX = r"2\sqrt{2} + \sqrt{10}"
@@ -121,17 +118,15 @@ class S2Solution(DeckSlide):
     section_name = "Solution"
 
     def construct(self) -> None:
-        self.legend = None  # the z / A / x legend kept in the corner on 2.1 to 2.3
+        self.legend = None  # the z / A / x legend kept in the corner on 2.1
         self.slide_2_0_section()
         self.slide_2_1_key_fact()
-        self.slide_2_2_many_square_roots()
-        self.slide_2_3_force_a_triangle()
-        self.slide_2_4a_lu()
-        self.slide_2_4b_ldv()
-        self.slide_2_4c_ldlt()
-        self.slide_2_4d_split_d()
-        self.slide_2_4e_shortcut()
-        self.slide_2_5_algorithm_and_hero()
+        self.slide_2_2_cholesky_plan()
+        self.slide_2_3a_lu()
+        self.slide_2_3b_ldv()
+        self.slide_2_3c_ldlt()
+        self.slide_2_3d_split_d()
+        self.slide_2_4_algorithm_and_hero()
 
     def begin_slide(self, notes: str) -> None:
         """Like DeckSlide.begin_slide, but the legend (if shown) stays on screen."""
@@ -464,10 +459,7 @@ class S2Solution(DeckSlide):
 
     @staticmethod
     def _three_equations(sigma: np.ndarray, size: float = th.BODY_SIZE) -> VGroup:
-        """a^2 + b^2 = s11, c^2 + d^2 = s22, ac + bd = s21, with the '=' signs lined up.
-
-        Parts are split so slide 2.3 can drop the b terms with TransformMatchingTex.
-        """
+        """a^2 + b^2 = s11, c^2 + d^2 = s22, ac + bd = s21, with the '=' signs lined up."""
         equations = VGroup(
             colored_math("a^2", "+", "b^2", "=", fmt(sigma[0, 0]), size=size),
             colored_math("c^2", "+", "d^2", "=", fmt(sigma[1, 1]), size=size),
@@ -479,216 +471,70 @@ class S2Solution(DeckSlide):
 
     # --- 2.2 -----------------------------------------------------------------
 
-    def slide_2_2_many_square_roots(self) -> None:
-        """sigma * sigma = sigma^2 beside A A^T = Sigma; rotations. Point: roots are not unique."""
+    def slide_2_2_cholesky_plan(self) -> None:
+        """The plan: lower-triangular A (called G), then the four steps in symbols."""
+        self.legend = None  # the A legend is done; begin_slide fades it with the rest
         self.begin_slide(
             notes="""
-            So a square root of Σ means any matrix A with A A transpose equal to
-            Σ, just like σ times σ is σ² in one dimension. But it is not unique.
-            If we rotate the round cloud first, it still looks exactly the same,
-            so A times any rotation Q works too. We need a rule to pick one.
+            A A transpose equals Σ gives three equations, but there are four
+            unknowns, so we get one free choice. Cholesky's choice is to make A
+            lower triangular, and we call that matrix G. Here is the plan for
+            finding it: eliminate to get L U, pull the pivots out into D, use
+            symmetry to get L D L transpose, then split D in half. Next we do each
+            step by hand on a 3 by 3. If anyone asks: with a positive diagonal G is
+            unique, and it costs about n cubed over 3 operations.
             """
         )
-        title = th.slide_title("Many square roots")
-        one_d = th.math(r"\sigma \cdot \sigma = \sigma^2")
-        n_d = colored_math("A", "A^T", "=", r"\Sigma")
-        swap = th.math(r"\longleftrightarrow", color=th.COLOR_MUTED)
-        analogy = VGroup(one_d, swap, n_d).arrange(RIGHT, buff=0.6)
-        analogy.next_to(title, DOWN, buff=0.6).align_to(title, LEFT)
-
-        rotation = colored_math("(AQ)(AQ)^T", "=", r"A\,QQ^T A^T", "=", "A", "A^T")
-        rotation_note = th.text("Q any rotation, so QQᵀ = I", th.CAPTION_SIZE, th.COLOR_MUTED)
-        left_column = VGroup(rotation, rotation_note).arrange(DOWN, buff=0.3, aligned_edge=LEFT)
-        left_column.next_to(analogy, DOWN, buff=0.9, aligned_edge=LEFT)
-
-        half_width = mm.shared_half_width([IDENTITY], cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
-        axes = make_square_axes((0.0, 0.0), half_width, th.PANEL_ROTATION)
-        axes.move_to([*th.ROTATION_PANEL_CENTER, 0])
-        cloud = make_point_cloud(self.z_display, axes, th.COLOR_Z)
-        marker = Dot(axes.c2p(*cfg.WORKED_Z), radius=th.WORKED_DOT_RADIUS, color=th.COLOR_TEXT)
-        unit_circle = DashedVMobject(
-            make_cov_ellipse(IDENTITY, (0.0, 0.0), cfg.QUESTION_ELLIPSE_K, axes, th.COLOR_Z)
-        )
-        rotate_label = th.text("rotate by Q", th.CAPTION_SIZE, th.COLOR_MUTED)
-        rotate_label.next_to(axes, UP, buff=0.12)
-
-        self.play(FadeIn(title), run_time=cfg.T_SHORT)
-        self.play(Write(one_d), run_time=cfg.T_MEDIUM)
-        self.play(FadeIn(swap), Write(n_d), run_time=cfg.T_MEDIUM)
-        self.reveal()
-
-        self.play(Write(rotation), FadeIn(rotation_note), run_time=cfg.T_MEDIUM)
-        self.play(Create(axes), fade_in_cloud(cloud), Create(unit_circle), run_time=cfg.T_MEDIUM)
-        self.play(FadeIn(marker, scale=2), FadeIn(rotate_label), run_time=cfg.T_SHORT)
-        self.play(
-            Rotate(
-                VGroup(cloud, marker),
-                angle=np.deg2rad(cfg.ROTATION_DEMO_DEGREES),
-                about_point=axes.c2p(0, 0),
+        title = th.slide_title("The plan: Cholesky decomposition")
+        intro = VGroup(
+            th.text("A Aᵀ = Σ: 3 equations, 4 unknowns. One free choice.", th.CAPTION_SIZE),
+            th.text(
+                "Cholesky's choice: b = 0. The lower-triangular A is called G.", th.CAPTION_SIZE
             ),
-            run_time=cfg.T_LONG,
-        )
-        self.play(
-            FadeIn(th.caption("Many square roots exist. We need a rule to pick one.")),
-            run_time=cfg.T_SHORT,
-        )
-
-    # --- 2.3 -----------------------------------------------------------------
-
-    def slide_2_3_force_a_triangle(self) -> None:
-        """Set b = 0 and solve one unknown at a time. Point: that rule is Cholesky."""
-        self.begin_slide(
-            notes="""
-            Here is the rule. Force the top-right entry of A to zero, and the
-            three equations untangle: the first gives a, then the third gives c,
-            then the second gives d. That triangular A is the Cholesky factor,
-            and from now on we call it G. It is unique, it exists exactly when Σ
-            is positive definite, and it is fast. And note the test is G times G
-            transpose, not G times G.
-            """
-        )
-        sigma = np.asarray(cfg.MAIN_SIGMA, dtype=float)
-        title = th.slide_title("The rule: force a triangle")
+        ).arrange(DOWN, buff=0.2, aligned_edge=LEFT)
         a_matrix = make_symbolic_matrix(GENERAL_A, th.COLOR_TEXT)
         a_block = labeled("A", a_matrix)
-        equations = self._three_equations(sigma)
-        left = VGroup(a_block, equations).arrange(DOWN, buff=0.5, aligned_edge=LEFT)
-        left.next_to(title, DOWN, buff=0.45).align_to(title, LEFT)
+        top = VGroup(intro, a_block).arrange(RIGHT, buff=0.8)
+        top.next_to(title, DOWN, buff=0.35).align_to(title, LEFT)
 
-        self.play(FadeIn(title), FadeIn(a_block), FadeIn(equations), run_time=cfg.T_MEDIUM)
-        triangle = self._force_b_to_zero(a_matrix, equations)
-        g_block = self._solve_triangle(sigma, a_block, triangle)
-        self.reveal()
+        key = colored_math(r"\Sigma", "=", "G", "G^T", size=th.TITLE_SIZE)
+        key_box = boxed(key, color=th.COLOR_G, buff=0.2).next_to(top, DOWN, buff=0.25).set_x(0)
 
-        self._play_cholesky_facts(title, g_block)
-        self.reveal()
-        self._play_why_not_gg(title, g_block)
+        steps = VGroup(
+            colored_math(r"1.\ \ ", r"\Sigma", r"= L\,U"),
+            colored_math(r"2.\ \ ", r"\Sigma", r"= L\,D\,V"),
+            colored_math(r"3.\ \ ", r"\Sigma", r"= L\,D\,L^T"),
+            colored_math(r"4.\ \ ", r"\Sigma", r"= (L\sqrt{D})(L\sqrt{D})^T =", "G", "G^T"),
+        ).arrange(DOWN, buff=0.22, aligned_edge=LEFT)
+        steps.next_to(key_box, DOWN, buff=0.25).align_to(title, LEFT).shift(0.4 * RIGHT)
+        reasons = VGroup(
+            th.text("eliminate: L stores the multipliers", th.CAPTION_SIZE, th.COLOR_MUTED),
+            th.text("pull the pivots out of U into D", th.CAPTION_SIZE, th.COLOR_MUTED),
+            th.text("symmetry gives V = Lᵀ", th.CAPTION_SIZE, th.COLOR_MUTED),
+            th.text("split D in half: G = L√D", th.CAPTION_SIZE, th.COLOR_MUTED),
+        )
+        for step, reason in zip(steps, reasons, strict=True):
+            reason.move_to(step, coor_mask=UP).set_x(th.PLAN_REASON_X, direction=LEFT)
+        caption = th.caption("Needs every pivot > 0. Next: each step by hand on a 3×3.")
 
-    def _force_b_to_zero(self, a_matrix: Matrix, equations: VGroup) -> VGroup:
-        """Grey out b in A and drop the b terms: a^2 = s11, c^2 + d^2 = s22, ac = s21."""
+        self.play(FadeIn(title), FadeIn(intro), FadeIn(a_block), run_time=cfg.T_MEDIUM)
         zero = replace_entry(a_matrix, 0, 1, "0", th.COLOR_MUTED)
-        reduced = VGroup(
-            colored_math("a^2", "=", equations[0][4].tex_string),
-            equations[1].copy(),
-            colored_math("ac", "=", equations[2][4].tex_string),
-        )
-        for new, old in zip(reduced, equations, strict=True):
-            new.move_to(old).align_to(old, LEFT)
-        reduced[0].shift((equations[0][3].get_x() - reduced[0][1].get_x()) * RIGHT)
-        reduced[2].shift((equations[2][3].get_x() - reduced[2][1].get_x()) * RIGHT)
-        b_label = th.text("b = 0", th.CAPTION_SIZE, th.COLOR_MUTED)
-        b_label.next_to(a_matrix, RIGHT, buff=0.3)
-        self.play(Transform(entry_at(a_matrix, 0, 1), zero), FadeIn(b_label), run_time=cfg.T_MEDIUM)
-        self.play(
-            TransformMatchingTex(equations[0], reduced[0]),
-            TransformMatchingTex(equations[2], reduced[2]),
-            run_time=cfg.T_MEDIUM,
-        )
-        self.remove(equations[1])
-        self.add(reduced[1])
-        self.play(FadeOut(b_label), run_time=cfg.T_SHORT)
-        return reduced
-
-    def _solve_triangle(self, sigma: np.ndarray, a_block: VGroup, triangle: VGroup) -> VGroup:
-        """Solve a, then c, then d, filling each into A; A becomes the yellow G."""
-        a, c, d = mm.triangle_solve_2x2(sigma)
-        s11, s21, s22 = (fmt(v) for v in (sigma[0, 0], sigma[1, 0], sigma[1, 1]))
-        solves = VGroup(
-            th.math(rf"a^2 = {s11} \;\Rightarrow\; a = {fmt(a)}"),
-            th.math(rf"{fmt(a)}c = {s21} \;\Rightarrow\; c = {fmt(c)}"),
-            th.math(rf"{fmt(c)}^2 + d^2 = {s22} \;\Rightarrow\; d = {fmt(d)}"),
-        ).arrange(DOWN, buff=0.35, aligned_edge=LEFT)
-        solves.move_to(triangle, coor_mask=UP).set_x(th.TRIANGLE_SOLVE_X, direction=LEFT)
-        a_matrix = a_block[1]
-        # (equation used, matrix entry filled, value) in solving order: a, c, d.
-        order = [(triangle[0], (0, 0), a), (triangle[2], (1, 0), c), (triangle[1], (1, 1), d)]
-        for line, (equation, (i, j), value) in zip(solves, order, strict=True):
-            box = SurroundingRectangle(equation, color=th.COLOR_G, buff=0.1)
-            filled = replace_entry(a_matrix, i, j, fmt(value), th.COLOR_G)
-            self.play(Create(box), Write(line), run_time=cfg.T_MEDIUM)
-            self.play(
-                Transform(entry_at(a_matrix, i, j), filled), FadeOut(box), run_time=cfg.T_SHORT
-            )
-
         g_label = th.math("G =", color=th.COLOR_G).move_to(a_block[0], aligned_edge=RIGHT)
         self.play(
+            Transform(entry_at(a_matrix, 0, 1), zero),
             Transform(a_block[0], g_label),
             a_matrix.get_brackets().animate.set_color(th.COLOR_G),
-            run_time=cfg.T_SHORT,
-        )
-        key = colored_math(
-            r"\text{Cholesky: }",
-            r"\Sigma",
-            "=",
-            "G",
-            "G^T",
-            r",\ \ ",
-            "G",
-            r"\text{ lower triangular}",
-        )
-        key[0].set_color(th.COLOR_TEXT)
-        key_box = boxed(key, color=th.COLOR_G, buff=0.2).move_to([0, th.TRIANGLE_KEY_Y, 0])
-        caption = th.caption("Force the top-right to zero: the equations solve one at a time.")
-        self.play(FadeIn(caption), FadeIn(key_box, scale=1.05), run_time=cfg.T_MEDIUM)
-        self.triangle_leftovers = VGroup(triangle, solves, caption)
-        self.triangle_key = key_box
-        return a_block
-
-    def _play_cholesky_facts(self, title: Mobject, g_block: VGroup) -> None:
-        """Three facts about Cholesky, one per click."""
-        self.play(
-            FadeOut(self.triangle_leftovers),
-            self.triangle_key.animate.next_to(g_block, DOWN, buff=0.35, aligned_edge=LEFT),
             run_time=cfg.T_MEDIUM,
         )
-        facts = VGroup(
-            th.text("1.  Unique (with a positive diagonal).", th.BODY_SIZE),
-            th.text("2.  Exists exactly when Σ is symmetric positive definite.", th.BODY_SIZE),
-            th.text("3.  Fast (about n³/3 operations) and numerically stable.", th.BODY_SIZE),
-        ).arrange(DOWN, buff=0.35, aligned_edge=LEFT)
-        facts.next_to(self.triangle_key, DOWN, buff=0.5).align_to(title, LEFT)
-        for index, fact in enumerate(facts):
-            if index > 0:
-                self.reveal()
-            self.play(FadeIn(fact, shift=0.2 * RIGHT), run_time=cfg.T_SHORT)
-        self.facts = facts
+        self.play(FadeIn(key_box, scale=1.05), run_time=cfg.T_SHORT)
+        for step, reason in zip(steps, reasons, strict=True):
+            self.reveal()
+            self.play(FadeIn(step, shift=0.2 * RIGHT), FadeIn(reason), run_time=cfg.T_SHORT)
+        self.play(FadeIn(caption), run_time=cfg.T_SHORT)
 
-    def _play_why_not_gg(self, title: Mobject, g_block: VGroup) -> None:
-        """The aside: G G is not Sigma, G G^T is."""
-        chol = self.main_chol
-        self.play(FadeOut(self.facts), run_time=cfg.T_SHORT)
-        question = th.text("Why not just A·A = Σ?", th.BODY_SIZE, th.COLOR_MUTED)
-        size = th.CAPTION_SIZE
-        rows = VGroup(
-            VGroup(
-                colored_math("G", "G", "=", size=size),
-                make_matrix(chol @ chol, th.COLOR_TEXT, size),
-                colored_math(r"\ne", r"\Sigma", size=size),
-                make_cross_mark(0.35),
-            ),
-            VGroup(
-                colored_math("G", "G^T", "=", size=size),
-                make_matrix(mm.covariance_of_linear_map(chol), th.COLOR_SIGMA, size),
-                colored_math("=", r"\Sigma", size=size),
-                make_check_mark(0.4),
-            ),
-        )
-        for row in rows:
-            row.arrange(RIGHT, buff=0.25)
-        rows.arrange(RIGHT, buff=1.0)
-        aside = VGroup(question, rows).arrange(DOWN, buff=0.3, aligned_edge=LEFT)
-        aside.next_to(self.triangle_key, DOWN, buff=0.45).align_to(title, LEFT)
-        self.play(FadeIn(question), run_time=cfg.T_SHORT)
-        for row in rows:
-            self.play(FadeIn(row[:3]), run_time=cfg.T_MEDIUM)
-            self.play(Create(row[3]), run_time=cfg.T_SHORT)
-        self.play(
-            FadeIn(th.caption("The data follows A Aᵀ, so that's the test.")), run_time=cfg.T_SHORT
-        )
+    # --- 2.3a ----------------------------------------------------------------
 
-    # --- 2.4a ----------------------------------------------------------------
-
-    def slide_2_4a_lu(self) -> None:
+    def slide_2_3a_lu(self) -> None:
         """Gaussian elimination on the 3x3 Sigma. Point: Sigma = L U, L holds the multipliers."""
         self.begin_slide(
             notes="""
@@ -697,10 +543,6 @@ class S2Solution(DeckSlide):
             multipliers in L, and what's left is U.
             """
         )
-        # The 3x3 matrices need the whole width, so the legend leaves here for good.
-        if self.legend is not None:
-            self.play(FadeOut(self.legend), run_time=cfg.T_SHORT)
-            self.legend = None
         route = mm.ldl_steps(cfg.EXAMPLE_3X3_SIGMA)
         title = th.slide_title("By hand, step 1: LU (ordinary elimination)")
         work = tex_matrix(cfg.EXAMPLE_3X3_SIGMA, th.COLOR_SIGMA)
@@ -789,9 +631,9 @@ class S2Solution(DeckSlide):
             font_size=th.BODY_SIZE * th.MATH_SCALE,
         )
 
-    # --- 2.4b ----------------------------------------------------------------
+    # --- 2.3b ----------------------------------------------------------------
 
-    def slide_2_4b_ldv(self) -> None:
+    def slide_2_3b_ldv(self) -> None:
         """Pull the pivots out of U. Point: Sigma = L D V."""
         self.begin_slide(
             notes="""
@@ -842,9 +684,9 @@ class S2Solution(DeckSlide):
             run_time=cfg.T_SHORT,
         )
 
-    # --- 2.4c ----------------------------------------------------------------
+    # --- 2.3c ----------------------------------------------------------------
 
-    def slide_2_4c_ldlt(self) -> None:
+    def slide_2_3c_ldlt(self) -> None:
         """Transpose L and it lands on V. Point: symmetry gives Sigma = L D L^T."""
         self.begin_slide(
             notes="""
@@ -894,9 +736,9 @@ class S2Solution(DeckSlide):
             FadeIn(th.caption("Symmetric matrix, symmetric factorization.")), run_time=cfg.T_SHORT
         )
 
-    # --- 2.4d ----------------------------------------------------------------
+    # --- 2.3d ----------------------------------------------------------------
 
-    def slide_2_4d_split_d(self) -> None:
+    def slide_2_3d_split_d(self) -> None:
         """Split D into two square roots. Point: Cholesky is LDL^T with rooted pivots."""
         self.begin_slide(
             notes="""
@@ -958,7 +800,7 @@ class S2Solution(DeckSlide):
         self._play_pivot_payoff()
 
     def _play_pivot_payoff(self) -> None:
-        """Dim the slide; the positive-pivot rule front and center, plus the plant for 3.4."""
+        """Dim the slide; the positive-pivot rule front and center, plus the plant for 3.3."""
         payoff = VGroup(
             th.text("Cholesky needs every pivot to be strictly positive.", th.BODY_SIZE),
             th.text("That's exactly what 'positive definite' means.", th.BODY_SIZE, th.COLOR_GOOD),
@@ -983,154 +825,17 @@ class S2Solution(DeckSlide):
         self.play(FadeIn(payoff_box, scale=1.05), run_time=cfg.T_MEDIUM)
         self.play(FadeIn(plant, shift=0.2 * UP), run_time=cfg.T_MEDIUM)
 
-    # --- 2.4e ----------------------------------------------------------------
+    # --- 2.4 -----------------------------------------------------------------
 
-    def slide_2_4e_shortcut(self) -> None:
-        """Solve G G^T = Sigma column by column. Point: same G, no detour; the general formula."""
-        self.begin_slide(
-            notes="""
-            In practice, you skip the detour and solve for G directly, column by
-            column. Same numbers, and the general formula is just that pattern
-            written down.
-            """
-        )
-        sigma = np.asarray(cfg.EXAMPLE_3X3_SIGMA, dtype=float)
-        size = sigma.shape[0]
-        title = th.slide_title("The shortcut: solve for G directly")
-        product = make_symbolic_matrix(
-            self._ggt_lower_entries(size), th.COLOR_TEXT, th.CAPTION_SIZE
-        )
-        sigma_mat = tex_matrix(sigma, th.COLOR_SIGMA, th.CAPTION_SIZE)
-        top = VGroup(
-            colored_math("G", "G^T", "=", size=th.CAPTION_SIZE),
-            product,
-            th.math("=", th.CAPTION_SIZE),
-            sigma_mat,
-        ).arrange(RIGHT, buff=0.2)
-        top.next_to(title, DOWN, buff=0.35).align_to(title, LEFT)
-
-        unknown = [
-            [f"g_{{{i + 1}{j + 1}}}" if j <= i else "0" for j in range(size)] for i in range(size)
-        ]
-        g_mat = make_symbolic_matrix(unknown, th.COLOR_G, th.CAPTION_SIZE)
-        for entry, (i, j) in zip(g_mat.get_entries(), np.ndindex(size, size), strict=True):
-            if j > i:
-                entry.set_color(th.COLOR_MUTED)
-        g_block = VGroup(th.math("G =", th.CAPTION_SIZE, th.COLOR_G), g_mat).arrange(
-            RIGHT, buff=0.2
-        )
-        g_block.next_to(top, DOWN, buff=0.5).to_edge(RIGHT, buff=th.EDGE_BUFF)
-
-        self.play(FadeIn(title), FadeIn(top), FadeIn(g_block), run_time=cfg.T_MEDIUM)
-        self.reveal()
-        lines = self._solve_columns(sigma, product, sigma_mat, g_mat, top)
-        caption = th.caption(
-            "Same G, without the detour. The triangle trick, one column at a time."
-        )
-        self.play(FadeIn(caption), run_time=cfg.T_SHORT)
-        self.reveal()
-
-        self.play(FadeOut(VGroup(top, g_block, lines, caption)), run_time=cfg.T_SHORT)
-        self._play_general_pattern(title)
-
-    @staticmethod
-    def _ggt_lower_entries(size: int) -> list[list[str]]:
-        """Symbolic G G^T, lower triangle only (it is symmetric; the rest shows as dots)."""
-        entries = []
-        for i in range(size):
-            row = []
-            for j in range(size):
-                if j > i:
-                    row.append(r"\cdot")
-                    continue
-                terms = [f"g_{{{i + 1}{k + 1}}}g_{{{j + 1}{k + 1}}}" for k in range(j + 1)]
-                if i == j:
-                    terms = [f"g_{{{i + 1}{k + 1}}}^2" for k in range(j + 1)]
-                row.append(" + ".join(terms))
-            entries.append(row)
-        return entries
-
-    def _solve_columns(
-        self, sigma: np.ndarray, product: Matrix, sigma_mat: Matrix, g_mat: Matrix, top: VGroup
-    ) -> VGroup:
-        """Each g_ij in order (mm.cholesky_direct_steps), highlighted and filled into G."""
-        steps = mm.cholesky_direct_steps(sigma)
-        known = np.zeros_like(sigma)
-        lines = VGroup()
-        for entry in steps:
-            lines.add(self._direct_step_tex(entry, known))
-            known[entry.row, entry.col] = entry.value
-        per_column = [sum(1 for e in steps if e.col == c) for c in range(sigma.shape[0])]
-        columns, start = VGroup(), 0
-        for count in per_column:
-            columns.add(
-                VGroup(*lines[start : start + count]).arrange(DOWN, buff=0.25, aligned_edge=LEFT)
-            )
-            start += count
-        columns.arrange(RIGHT, buff=0.6, aligned_edge=UP)
-        columns.next_to(top, DOWN, buff=0.5).align_to(top, LEFT)
-
-        for entry, line in zip(steps, lines, strict=True):
-            i, j = entry.row, entry.col
-            boxes = VGroup(
-                SurroundingRectangle(entry_at(product, i, j), color=th.COLOR_TEXT, buff=0.06),
-                SurroundingRectangle(entry_at(sigma_mat, i, j), color=th.COLOR_SIGMA, buff=0.06),
-            )
-            filled = replace_entry(g_mat, i, j, fmt(entry.value), th.COLOR_G)
-            self.play(Create(boxes), Write(line), run_time=cfg.T_SHORT)
-            self.play(
-                Transform(entry_at(g_mat, i, j), filled), FadeOut(boxes), run_time=cfg.T_SHORT
-            )
-        return columns
-
-    @staticmethod
-    def _direct_step_tex(entry: mm.CholeskyEntry, known: np.ndarray) -> MathTex:
-        """'g22 = sqrt(5 - 1^2) = 2' or 'g32 = (3 - 1*1) / 2 = 1', from the known entries."""
-        i, j = entry.row, entry.col
-        name = f"g_{{{i + 1}{j + 1}}}"
-        if entry.is_diagonal:
-            minus = "".join(f" - {paren(known[i, k])}^2" for k in range(j))
-            body = rf"\sqrt{{{fmt(entry.sigma_entry)}{minus}}}"
-        else:
-            minus = "".join(rf" - {paren(known[i, k])}\cdot {paren(known[j, k])}" for k in range(j))
-            numerator = f"({fmt(entry.sigma_entry)}{minus})" if minus else fmt(entry.sigma_entry)
-            body = rf"{numerator} / {fmt(entry.divisor)}"
-        line = MathTex(
-            name, rf"= {body} = {fmt(entry.value)}", font_size=th.CAPTION_SIZE * th.MATH_SCALE
-        )
-        line[0].set_color(th.COLOR_G)
-        return line
-
-    def _play_general_pattern(self, title: Mobject) -> None:
-        general = VGroup(
-            th.math(r"g_{jj} = \sqrt{\sigma_{jj} - \sum_{k<j} g_{jk}^2}"),
-            th.math(
-                r"g_{ij} = \frac{1}{g_{jj}}\Big(\sigma_{ij} - \sum_{k<j} g_{ik}\, g_{jk}\Big)"
-                r"\quad \text{for } i > j"
-            ),
-        ).arrange(DOWN, buff=0.6)
-        explain = VGroup(
-            th.text("Diagonal: what's left of the variance, square-rooted.", th.CAPTION_SIZE),
-            th.text(
-                "Below: what's left of the covariance, divided by the diagonal.", th.CAPTION_SIZE
-            ),
-        ).arrange(DOWN, buff=0.2, aligned_edge=LEFT)
-        explain.set_color(th.COLOR_MUTED)
-        VGroup(general, explain).arrange(DOWN, buff=0.7).move_to(0.3 * DOWN)
-        self.play(Write(general[0]), run_time=cfg.T_MEDIUM)
-        self.play(Write(general[1]), run_time=cfg.T_MEDIUM)
-        self.play(FadeIn(explain), run_time=cfg.T_SHORT)
-
-    # --- 2.5 -----------------------------------------------------------------
-
-    def slide_2_5_algorithm_and_hero(self) -> None:
+    def slide_2_4_algorithm_and_hero(self) -> None:
         """Algorithm box, then G applied to the plane and the cloud, then the code.
 
         The slide ends on exactly HeroFrame (components.py); Section 3 opens on it.
         """
         self.begin_slide(
             notes="""
-            Back to our 2 by 2, where G is 2, 0, 1, 2. The whole algorithm is
+            Back to our 2 by 2. Its Σ is the top-left corner of the 3 by 3, so its
+            G is the top-left corner of the G we just found: 2, 0, 1, 2. The whole algorithm is
             four lines: choose μ and Σ, factor Σ, draw independent normals, and
             compute μ plus G z. Watch the grid: G shears the whole plane, the
             circle becomes an ellipse, and then everything shifts by μ. Our
@@ -1138,26 +843,37 @@ class S2Solution(DeckSlide):
             """
         )
         title = th.slide_title("The algorithm")
-        bridge = VGroup(
-            th.text("Back to our 2×2:", th.BODY_SIZE),
-            make_labeled_matrix("G", self.main_chol, th.COLOR_G),
-        ).arrange(RIGHT, buff=0.35)
-        bridge.next_to(title, DOWN, buff=0.4).align_to(title, LEFT)
+        bridge = self._corner_bridge()
         algorithm = VGroup(
             colored_math(r"1.\ \text{Choose } \boldsymbol{\mu} \text{ and }", r"\Sigma"),
             colored_math(r"2.\ ", "G", r"= \operatorname{chol}(", r"\Sigma", ")"),
             colored_math(r"3.\ ", r"\mathbf{z}", r"\sim \mathcal{N}(\mathbf{0}, I)"),
             colored_math(r"4.\ ", r"\mathbf{x}", r"= \boldsymbol{\mu} +", "G", r"\mathbf{z}"),
         ).arrange(DOWN, buff=0.35, aligned_edge=LEFT)
-        algorithm_box = boxed(algorithm, buff=0.45).next_to(bridge, DOWN, buff=0.5).set_x(0)
+        algorithm_box = boxed(algorithm, buff=0.45)
+        VGroup(bridge, algorithm_box).arrange(RIGHT, buff=0.9).next_to(title, DOWN, buff=0.7).set_x(
+            0
+        )
+        corner_box = SurroundingRectangle(
+            VGroup(*bridge.corner_entries), color=th.COLOR_G, buff=0.1
+        )
 
-        self.play(FadeIn(title), FadeIn(bridge), run_time=cfg.T_MEDIUM)
+        big, arrow, small = bridge[0]
+        self.play(FadeIn(title), FadeIn(big), run_time=cfg.T_MEDIUM)
+        self.play(Create(corner_box), FadeIn(bridge[1]), run_time=cfg.T_SHORT)
+        self.play(GrowArrow(arrow), FadeIn(small, shift=0.2 * RIGHT), run_time=cfg.T_MEDIUM)
         self.play(FadeIn(algorithm_box[0]), run_time=cfg.T_SHORT)
         for line in algorithm:
             self.play(FadeIn(line, shift=0.2 * RIGHT), run_time=cfg.T_SHORT)
         self.reveal()
 
-        self.play(FadeOut(title), FadeOut(bridge), FadeOut(algorithm_box), run_time=cfg.T_SHORT)
+        self.play(
+            FadeOut(title),
+            FadeOut(bridge),
+            FadeOut(corner_box),
+            FadeOut(algorithm_box),
+            run_time=cfg.T_SHORT,
+        )
         hero = HeroFrame(self.z_display, self.main_chol)
         self._hero_animation(hero)
         self.reveal()
@@ -1168,6 +884,30 @@ class S2Solution(DeckSlide):
         self.remove(*self.mobjects)
         self.add(hero)
         self.wait(cfg.T_SETTLE)
+
+    def _corner_bridge(self) -> VGroup:
+        """The 3x3 G with its top-left 2x2 boxed, an arrow, and the 2x2 G.
+
+        MAIN_SIGMA is the top-left block of EXAMPLE_3X3_SIGMA, and Cholesky of
+        a top-left block is the top-left block of the Cholesky factor, so the
+        2x2 G comes straight out of the 3x3 work. The caller boxes ``corner_entries``
+        after layout, so the box sits on their final positions.
+        """
+        chol_3x3 = mm.ldl_steps(cfg.EXAMPLE_3X3_SIGMA).chol
+        assert np.allclose(chol_3x3[:2, :2], self.main_chol), (
+            "MAIN_SIGMA must be the top-left 2x2 block of EXAMPLE_3X3_SIGMA for this slide"
+        )
+        size = th.CAPTION_SIZE
+        big = VGroup(
+            th.math(r"G_{3\times 3} =", size, th.COLOR_G), tex_matrix(chol_3x3, th.COLOR_G, size)
+        ).arrange(RIGHT, buff=0.15)
+        arrow = Arrow(LEFT, RIGHT, color=th.COLOR_MUTED).scale(0.45)
+        small = make_labeled_matrix("G", self.main_chol, th.COLOR_G)
+        row = VGroup(big, arrow, small).arrange(RIGHT, buff=0.25)
+        note = th.text("our 2×2 is the top-left corner", th.CAPTION_SIZE, th.COLOR_MUTED)
+        bridge = VGroup(row, note).arrange(DOWN, buff=0.35)
+        bridge.corner_entries = [entry_at(big[1], i, j) for i in range(2) for j in range(2)]
+        return bridge
 
     def _hero_animation(self, hero: HeroFrame) -> None:
         """Apply G to a grid and the cloud, shift by mu, and track the worked point.

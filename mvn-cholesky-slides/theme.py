@@ -83,19 +83,15 @@ PANEL_STRIP = 3.0  # side of each plot in the recap strip (4.1)
 DENSITY_WIDTH = 11.5  # 1D bell-curve axes (slide 1.6)
 DENSITY_HEIGHT = 2.9
 
-# Gaussian process panel (1.1 and its replay on 4.2): same size on both slides.
-GP_WIDTH = 10.0
-GP_HEIGHT = 3.6
-GP_DOT_RADIUS = 0.06
 
-# Hero animation (2.5). Section 3 opens on this exact frame, so both sections
+# Hero animation (2.4). Section 3 opens on this exact frame, so both sections
 # build it from these values (see components.hero_final_frame).
 HERO_MAX_WIDTH = 7.0  # box the hero NumberPlane must fit in
 HERO_MAX_HEIGHT = 6.5
 HERO_PLANE_CENTER = (-3.2, -0.45)
 HERO_CODE_Y = 0.3  # vertical position of the NumPy code block beside the plane
 
-# Pivot gauge (3.4, thumbnail on 4.3): a vertical bar for the second pivot.
+# Pivot gauge (3.3, thumbnail on 4.2): a vertical bar for the second pivot.
 GAUGE_HEIGHT = 2.6  # screen height of a pivot of 1
 GAUGE_WIDTH = 0.55
 GAUGE_MIN = -0.5  # lowest pivot the gauge can show (1.2^2 = 1.44 gives -0.44)
@@ -114,32 +110,30 @@ PANEL_ROW = 2.1  # side of each plot in the two attempt rows (1.7)
 
 # --- Section 2 layout (scenes/s2_solution.py) --------------------------------
 
-PANEL_ROTATION = 3.2  # the rotating round cloud (2.2), below the legend
-ROTATION_PANEL_CENTER = (4.3, -1.2)
-TRIANGLE_SOLVE_X = -1.2  # left edge of the solving steps on 2.3
-TRIANGLE_KEY_Y = -2.1  # the boxed "Cholesky: Sigma = G G^T" line on 2.3
-HERO_SIDE_CENTER = (3.6, 1.1)  # x = mu + G z with G and mu, beside the hero plane (2.5)
+PLAN_REASON_X = 0.8  # left edge of the grey reasons beside the steps on 2.2
+HERO_SIDE_CENTER = (3.6, 1.1)  # x = mu + G z with G and mu, beside the hero plane (2.4)
 
 # --- Section 3 layout (scenes/s3_sampler.py) ---------------------------------
 
-PANEL_SWEEP = 5.0  # the single large plot of the rho sweep (slide 3.4)
-SECTION_OVERLAY_OPACITY = 0.95  # dim over the 2.5 frame behind the section-3 card
+PANEL_SWEEP = 5.0  # the single large plot of the rho sweep (slide 3.3)
+SECTION_OVERLAY_OPACITY = 0.95  # dim over the 2.4 frame behind the section-3 card
 VERIFY_PLANE_HEIGHT = 5.2  # 3.1 shrinks the hero plane to this height to make room
 VERIFY_PLANE_CENTER = (-3.7, -0.15)
 DEMO_PANEL = 2.2  # side of each plot in the row of four on slide 3.2
-EIGEN_PANEL = 4.6  # the cloud on the eigen slide (3.3)
-EIGEN_TEST_PANEL = 3.2  # the small plane where Sigma is applied to test arrows (3.3)
-EIGEN_TEST_CENTER = (4.9, 0.75)  # top right, so the readouts fit underneath it on the left
-EIGEN_READOUT_Y = -0.75  # first Sigma-times-arrow readout on 3.3
-SWEEP_GAUGE_CENTER = (6.1, -0.55)  # the pivot gauge at the right edge of 3.4
+SWEEP_GAUGE_CENTER = (6.1, -0.55)  # the pivot gauge at the right edge of 3.3
 
 # --- Section 4 layout (scenes/s4_wrapup.py) ----------------------------------
 
-LIMITS_THUMB_SCALE = 0.5  # pivot gauge thumbnail on 4.3, relative to the 3.4 gauge
-LIMITS_THUMB_X = 5.0  # x position of the thumbnails on 4.3
+# Appendix A.2, the eigen view (moved here from Section 3).
+EIGEN_PANEL = 4.6  # the cloud on the eigen slide
+EIGEN_TEST_PANEL = 3.2  # the small plane where Sigma is applied to test arrows
+EIGEN_TEST_CENTER = (4.9, 0.75)  # top right, so the readouts fit underneath it on the left
+EIGEN_READOUT_Y = -0.75  # first Sigma-times-arrow readout
+
+LIMITS_THUMB_SCALE = 0.5  # pivot gauge thumbnail on 4.2, relative to the 3.3 gauge
+LIMITS_THUMB_X = 5.0  # x position of the thumbnails on 4.2
 LIMITS_DIM_OPACITY = 0.5  # earlier limits dim when the next one appears
-BOOKEND_DIM_OPACITY = 0.25  # earlier curves on 4.2 dim when the next one is drawn
-LIMITS_THUMB_WIDTH = 2.4  # portfolio histogram thumbnail on 4.3
+LIMITS_THUMB_WIDTH = 2.4  # portfolio histogram thumbnail on 4.2
 LIMITS_THUMB_HEIGHT = 1.0
 
 # --- Points and lines --------------------------------------------------------

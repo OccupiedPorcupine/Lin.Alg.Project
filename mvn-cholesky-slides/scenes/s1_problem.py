@@ -31,8 +31,6 @@ from components import (
     make_cross_mark,
     make_density_axes,
     make_dim_overlay,
-    make_gp_axes,
-    make_gp_states,
     make_histogram,
     make_labeled_matrix,
     make_matrix,
@@ -138,28 +136,24 @@ class S1Problem(DeckSlide):
     # --- 1.1 -----------------------------------------------------------------
 
     def slide_1_1_hook(self) -> None:
-        """Three uses, one per click. Point: all of them need random numbers that move together."""
+        """Two uses, one per click. Point: both need random numbers that move together."""
         self.begin_slide(
-            notes=f"""
-            Before any math, here are three places where correlated randomness
+            notes="""
+            Before any math, here are two places where correlated randomness
             matters. A bank simulating a portfolio underestimates its risk if it
-            treats the stocks as independent. A random smooth curve is really one
-            draw from a {cfg.GP_N_POINTS} dimensional normal, and synthetic data is only useful
-            if it keeps the real correlations. All three need random numbers that
+            treats the stocks as independent, and synthetic data is only useful
+            if it keeps the real correlations. Both need random numbers that
             move together.
             """
         )
         self._hook_portfolio()
         self.reveal()
         self.play(FadeOut(*self.mobjects), run_time=cfg.T_SHORT)
-        self._hook_gaussian_processes()
-        self.reveal()
-        self.play(FadeOut(*self.mobjects), run_time=cfg.T_SHORT)
         self._hook_synthetic_data()
         self.reveal()
 
         message = VGroup(
-            th.text("All three need random numbers", th.TITLE_SIZE),
+            th.text("Both need random numbers", th.TITLE_SIZE),
             th.text("that move together.", th.TITLE_SIZE),
         ).arrange(DOWN, buff=0.25)
         self.play(FadeIn(make_dim_overlay()), run_time=cfg.T_SHORT)
@@ -259,41 +253,6 @@ class S1Problem(DeckSlide):
         self.play(FadeIn(legend), run_time=cfg.T_SHORT)
         self.play(Create(var_lines), FadeIn(var_label), run_time=cfg.T_MEDIUM)
         self.play(FadeIn(caption), run_time=cfg.T_SHORT)
-
-    def _hook_gaussian_processes(self) -> None:
-        """Jagged independent values become smooth random curves (replayed on 4.2)."""
-        title = th.slide_title("Gaussian processes")
-        axes = make_gp_axes().next_to(title, DOWN, buff=1.0).set_x(0)
-        before = th.text(
-            f"{cfg.GP_N_POINTS} independent random values", th.CAPTION_SIZE, th.COLOR_Z
-        )
-        after = th.text("One smooth random curve", th.CAPTION_SIZE, th.COLOR_X)
-        for label in (before, after):
-            label.next_to(axes, UP, buff=0.2).align_to(axes, LEFT)
-        caption = th.caption(
-            f"A random smooth curve is one sample from a {cfg.GP_N_POINTS}-dimensional normal."
-        )
-
-        self.play(FadeIn(title), Create(axes), run_time=cfg.T_SHORT)
-        previous = None
-        for index in range(cfg.GP_N_CURVES):
-            start, end = make_gp_states(self.gp_z[index], self.gp_x[index], axes)
-            # Dim the previous curve: stroke only, so the curve does not gain a fill.
-            fade_previous = (
-                [
-                    previous[0].animate.set_stroke(opacity=0.25),
-                    previous[1].animate.set_opacity(0.25),
-                ]
-                if previous
-                else []
-            )
-            self.play(*fade_previous, FadeIn(start, lag_ratio=0.02), run_time=cfg.T_MEDIUM)
-            if index == 0:
-                self.play(FadeIn(before), run_time=cfg.T_SHORT)
-            self.play(Transform(start, end), run_time=cfg.T_LONG)
-            if index == 0:
-                self.play(Transform(before, after), FadeIn(caption), run_time=cfg.T_SHORT)
-            previous = start
 
     def _hook_synthetic_data(self) -> None:
         """Original and synthetic correlation heatmaps, then synthetic rows ticking in."""

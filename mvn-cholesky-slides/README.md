@@ -11,8 +11,8 @@ correlated data N(μ, Σ), and the Cholesky factor G of Σ (with G Gᵀ = Σ) is
 "matrix square root" that turns one into the other via x = μ + G z.
 
 Notation used everywhere: **G** is the Cholesky factor, **L** only appears on
-slide 2.4 as the unit lower-triangular factor from elimination, and **A** is a
-general matrix on slides 2.1 to 2.3.
+slides 2.2 and 2.3 as the unit lower-triangular factor from elimination, and
+**A** is a general matrix on slides 2.1 and 2.2.
 
 ## Setup
 
@@ -91,7 +91,7 @@ SLIDE_FLOW.md    every slide and click in order; edit it to plan changes to the 
 ```
 
 Each slide is one method named after its outline number, for example
-`slide_2_5_algorithm_and_hero`, and each section's `construct()` is just the
+`slide_2_4_algorithm_and_hero`, and each section's `construct()` is just the
 ordered list of those methods. Slide titles on screen carry no numbers;
 instead each section opens with a section slide (`slide_2_0_section`, and so
 on) showing the section number, name and a one-line subtitle. The name comes
@@ -105,14 +105,14 @@ matrix, readout, ellipse and axis range is computed from them, so just
 re-render. Σ must be symmetric positive definite; `make test` will tell you if
 it is not. If you change `MAIN_SIGMA`, two tests that pin the default numbers
 (the factor `[[2, 0], [1, 2]]` and the worked point `[2, 0.5]`) will fail by
-design: update or delete them. In the hero animation (slide 2.5) the moving
+design: update or delete them. In the hero animation (slide 2.4) the moving
 grid covers z in ±`HERO_GRID_HALF_WIDTH`; lower it if a large Σ pushes the
 grid off the axes. The other matrices each have their own block in
-`config.py`: `EXAMPLE_3X3_SIGMA` (the hand computation on 2.4 and the 3×3
+`config.py`: `EXAMPLE_3X3_SIGMA` (the hand computation on 2.3 and the 3×3
 check on 3.1), `DEMO_STRUCTURES` with `DEMO_CAPTIONS` (3.2),
-`EIGEN_EXAMPLE_SIGMA` and `EIGEN_EXAMPLE_SIGMA_2` (3.3), `RHO_SWEEP_PATH`,
-`RHO_ZERO_PIVOT` and `RHO_NEGATIVE_PIVOT` (3.4), and the hook's
-`PORTFOLIO_*`, `GP_*` and `SYNTH_*` values (1.1, replayed on 4.2 and 4.3).
+`EIGEN_EXAMPLE_SIGMA` and `EIGEN_EXAMPLE_SIGMA_2` (appendix A.2), `RHO_SWEEP_PATH`,
+`RHO_ZERO_PIVOT` and `RHO_NEGATIVE_PIVOT` (3.3), and the hook's
+`PORTFOLIO_*` and `SYNTH_*` values (1.1; the portfolio returns on 4.2).
 Some tests pin the spec's exact numbers (for example the 3×3 elimination
 steps); they fail by design when you change those matrices.
 
@@ -134,18 +134,23 @@ remove it from `SCENES` in the Makefile.
 
 If the talk runs long, cut in this order (each is one line in `construct()`):
 
-1. Appendix A.1 (`slide_a_1_derivation` in `S4WrapUp`) sits after the closing
-   slide already; only show it if asked.
+1. The appendix (A.1 the derivation, A.2 the eigen view, both in `S4WrapUp`)
+   sits after the closing slide already; only show it if asked. If you remove
+   A.2, also drop "(appendix)" from the eigenvalue line on slide 4.2.
 2. 1.4 Reading the formula. Sampling never uses the density, and 3.1's
    contour ellipses still work without it.
-3. 2.4e The shortcut. Keep only its final "general pattern" reveal, or drop it.
-4. 3.3 The eigen view. If you cut it, remove "(eigen view)" on slide 4.3.
-5. 3.5 (the 3D bonus) is already off by default.
+3. 3.2 Turning the dial: trim `DEMO_STRUCTURES` in `config.py` from four
+   panels to two.
+4. 3.4 (the 3D bonus) is already off by default.
 
-Two slides are deliberately linked: slide 2.5 ends on exactly the frame that
+Slide 2.4 gets its 2×2 G from the corner of the 3×3 G worked out on 2.3, so
+`MAIN_SIGMA` must stay the top-left block of `EXAMPLE_3X3_SIGMA`; a test and
+an assert in the scene check this.
+
+Two slides are deliberately linked: slide 2.4 ends on exactly the frame that
 Section 3 opens with (both build it with `HeroFrame` in `components.py`), so
 the orange cloud carries across the section boundary. If you cut or change
-2.5's ending, keep that in mind.
+2.4's ending, keep that in mind.
 
 **Edit speaker notes.** The notes live at the top of each slide method, in
 `self.begin_slide(notes="""...""")`. Edit them there, re-render the section,
@@ -163,13 +168,13 @@ value: `T_SHORT`, `T_MEDIUM`, `T_LONG`, `RHO_SWEEP_SECONDS_PER_LEG` or
 `run_time=cfg.T_...`; without one Manim uses a fixed 1 second that
 `SPEED_UP` cannot reach.
 
-**Turn on the 3D bonus slide (3.5).** Set `ENABLE_3D_BONUS = True` in
+**Turn on the 3D bonus slide (3.4).** Set `ENABLE_3D_BONUS = True` in
 `config.py`. The Makefile then renders `S3bThreeD` (the 3D cloud of
 `EXAMPLE_3X3_SIGMA`) and puts it between sections 3 and 4. It is off by
 default because it is slow to render.
 
-**Other switches.** `ENABLE_EIGEN_SECOND_EXAMPLE` (the second matrix on 3.3) and
-`ENABLE_NEGATIVE_PIVOT_REVEAL` (the ρ = 1.2 step on 3.4) can each be turned off
+**Other switches.** `ENABLE_EIGEN_SECOND_EXAMPLE` (the second matrix on A.2) and
+`ENABLE_NEGATIVE_PIVOT_REVEAL` (the ρ = 1.2 step on 3.3) can each be turned off
 in `config.py`.
 
 ## Notes on a few design choices
@@ -180,10 +185,10 @@ in `config.py`.
   in manim-slides 5, so the call sits at the start of each slide, inside
   `DeckSlide.begin_slide`. Reveal pauses inside a slide (`self.reveal()`) repeat
   the same notes so the presenter view never goes blank.
-- The 2.5 hero animation maps points through data coordinates
+- The 2.4 hero animation maps points through data coordinates
   (screen → `plane.p2c` → apply G → `plane.c2p`) instead of `ApplyMatrix`,
   because the plane is not unit scale. The scene asserts that the tracked point
   lands exactly on μ + G z.
-- The ρ sweep on 3.4 never calls `np.linalg.cholesky` at ρ ≥ 1: the pivot
+- The ρ sweep on 3.3 never calls `np.linalg.cholesky` at ρ ≥ 1: the pivot
   1 − ρ² and the factor come from closed forms in `mvn_math.py`
   (`unit_corr_pivot`, `unit_corr_factor`).

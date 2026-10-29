@@ -25,8 +25,6 @@ from components import (
     boxed,
     fade_in_cloud,
     fmt,
-    fmt_vector,
-    make_axes,
     make_cov_ellipse,
     make_dim_overlay,
     make_labeled_matrix,
@@ -98,13 +96,12 @@ class S3Sampler(DeckSlide):
         self.slide_3_0_section()
         self.slide_3_1_does_it_work()
         self.slide_3_2_turning_the_dial()
-        self.slide_3_3_eigen_view()
-        self.slide_3_4_until_it_breaks()
+        self.slide_3_3_until_it_breaks()
 
     # --- 3.0 -----------------------------------------------------------------
 
     def slide_3_0_section(self) -> None:
-        """Section slide over the last frame of 2.5, which stays on screen into 3.1."""
+        """Section slide over the last frame of 2.4, which stays on screen into 3.1."""
         self.begin_slide(
             notes="""
             The sampler is built, so let's put it to work. This section is part
@@ -112,7 +109,7 @@ class S3Sampler(DeckSlide):
             the dial on Sigma and watch the data respond.
             """
         )
-        # Exactly the frame 2.5 ended on, added without animation, so the
+        # Exactly the frame 2.4 ended on, added without animation, so the
         # switch between the two section videos is invisible.
         self.hero = HeroFrame(self.z_display, self.main_chol)
         self.add(self.hero)
@@ -132,9 +129,9 @@ class S3Sampler(DeckSlide):
             for? Measured from {cfg.N_STATS:,} samples, the mean and covariance
             match the targets to about two decimal places, and the dots fill the
             1 and 2 sigma contours just as the density predicts. The 3 by 3 G we
-            computed by hand in 2.4 passes the same test.
+            computed by hand in 2.3 passes the same test.
             """
-        # Not begin_slide: that would fade out the orange cloud, which carries over from 2.5.
+        # Not begin_slide: that would fade out the orange cloud, which carries over from 2.4.
         self.next_slide(notes=notes)
         self.current_notes = notes
         hero = self.hero
@@ -238,7 +235,7 @@ class S3Sampler(DeckSlide):
         return contours
 
     def _three_by_three_check(self) -> VGroup:
-        """The hand-computed 3x3 G from 2.4, and the Sigma-hat it generates."""
+        """The hand-computed 3x3 G from 2.3, and the Sigma-hat it generates."""
         size = th.CAPTION_SIZE
         dim = len(cfg.EXAMPLE_3X3_SIGMA)
         chol = mm.cholesky_factor(cfg.EXAMPLE_3X3_SIGMA)
@@ -338,222 +335,11 @@ class S3Sampler(DeckSlide):
 
     # --- 3.3 -----------------------------------------------------------------
 
-    def slide_3_3_eigen_view(self) -> None:
-        """Sigma applied to test arrows, then eigen arrows on the ellipse. Point: read the shape."""
-        self.begin_slide(
-            notes="""
-            Cholesky told us how to build this cloud. Eigenvectors tell us how
-            to read it. Most arrows turn when I multiply them by Sigma, but two
-            directions only stretch: the diagonal by 9 and the other diagonal by
-            1. Their square roots, 3 and 1, are exactly how spread out the cloud
-            is along each axis.
-            """
-        )
-        sigma = np.asarray(cfg.EIGEN_EXAMPLE_SIGMA, dtype=float)
-        title = th.slide_title("The eigen view")
-        examples = [sigma]
-        if cfg.ENABLE_EIGEN_SECOND_EXAMPLE:
-            examples.append(np.asarray(cfg.EIGEN_EXAMPLE_SIGMA_2, dtype=float))
-        half_width = mm.shared_half_width(examples, cfg.AXIS_N_SD, cfg.AXIS_ROUND_STEP)
-        axes = make_square_axes((0.0, 0.0), half_width, th.EIGEN_PANEL).move_to([-3.75, -0.3, 0])
-        # Morphs between the two examples by interpolating Sigma; every in-between
-        # matrix is positive definite, so Cholesky works on each frame.
-        blend = ValueTracker(0.0)
-
-        def current_sigma() -> np.ndarray:
-            return (1 - blend.get_value()) * examples[0] + blend.get_value() * examples[-1]
-
-        cloud = make_point_cloud(
-            mm.transform(self.z_display, np.zeros(2), mm.cholesky_factor(sigma)),
-            axes,
-            th.COLOR_X,
-            panel_dot_radius(th.EIGEN_PANEL),
-        )
-        sigma_block = make_labeled_matrix(r"\Sigma", sigma, th.COLOR_SIGMA, th.CAPTION_SIZE)
-        sigma_block.move_to([0.0, 2.35, 0]).set_x(-0.6, direction=LEFT)
-        question = th.caption("Which directions does this cloud stretch along, and by how much?")
-
-        self.play(FadeIn(title), Create(axes), FadeIn(sigma_block), run_time=cfg.T_SHORT)
-        self.play(fade_in_cloud(cloud), FadeIn(question), run_time=cfg.T_MEDIUM)
-        self.reveal()
-
-        tests = self._direction_tests(sigma, sigma_block, question)
-        self.reveal()
-
-        self.play(FadeOut(tests), run_time=cfg.T_SHORT)
-        ellipse = always_redraw(
-            lambda: make_cov_ellipse(current_sigma(), (0.0, 0.0), cfg.EIGEN_ARROW_K, axes)
-        )
-        arrows = always_redraw(lambda: self._eigen_arrows(current_sigma(), axes))
-        rows = self._eigen_rows(sigma).next_to(sigma_block, DOWN, buff=0.6, aligned_edge=LEFT)
-        roots = np.sqrt(mm.eigen_axes(sigma)[0])
-        caption = th.caption(
-            "Eigenvectors set the ellipse's axes. √eigenvalues set the spread: "
-            f"{fmt(roots[0])} one way, {fmt(roots[1])} the other."
-        )
-        self.play(Create(ellipse), run_time=cfg.T_MEDIUM)
-        self.play(
-            GrowFromPoint(arrows, axes.c2p(0, 0)),
-            FadeIn(rows),
-            swap_caption(self.eigen_caption, caption),
-            run_time=cfg.T_MEDIUM,
-        )
-
-        if cfg.ENABLE_EIGEN_SECOND_EXAMPLE:
-            self.reveal()
-            second = examples[-1]
-            live_cloud = always_redraw(
-                lambda: make_point_cloud(
-                    mm.transform(self.z_display, np.zeros(2), mm.cholesky_factor(current_sigma())),
-                    axes,
-                    th.COLOR_X,
-                    panel_dot_radius(th.EIGEN_PANEL),
-                )
-            )
-            self.remove(cloud)
-            self.add(live_cloud, ellipse, arrows)
-            new_block = make_labeled_matrix(r"\Sigma", second, th.COLOR_SIGMA, th.CAPTION_SIZE)
-            new_block.move_to(sigma_block, aligned_edge=LEFT)
-            new_rows = self._eigen_rows(second).move_to(rows, aligned_edge=UL)
-            new_values = mm.eigen_axes(second)[0]
-            new_caption = th.caption(
-                f"Not just a 45° trick: eigenvalues {fmt(new_values[0])} and "
-                f"{fmt(new_values[1])}, so spreads {fmt(np.sqrt(new_values[0]))} "
-                f"and {fmt(np.sqrt(new_values[1]))}."
-            )
-            self.play(
-                blend.animate.set_value(1.0),
-                Transform(sigma_block, new_block),
-                Transform(rows, new_rows),
-                swap_caption(caption, new_caption),
-                run_time=cfg.T_LONG,
-            )
-            # Not a frozen frame: rerun the updaters so everything shows the exact final Sigma.
-            self.wait(cfg.T_SETTLE, frozen_frame=False)
-            for live in (live_cloud, ellipse, arrows):
-                live.clear_updaters()
-
-    def _direction_tests(self, sigma: np.ndarray, anchor: Mobject, question: Mobject) -> VGroup:
-        """Apply Sigma to each test direction on a small plane, one click per direction.
-
-        Returns everything it drew, so the caller can clear it. Leaves the
-        current caption in ``self.eigen_caption``.
-        """
-        images = [sigma @ np.asarray(v) for v in cfg.EIGEN_TEST_DIRECTIONS]
-        coords = np.concatenate([np.asarray(cfg.EIGEN_TEST_DIRECTIONS), images])
-        low = float(np.floor(min(coords.min(), 0.0))) - 1
-        high = float(np.ceil(coords.max())) + 1
-        plane = make_axes((low, high), (low, high), th.EIGEN_TEST_PANEL, th.EIGEN_TEST_PANEL)
-        plane.move_to([*th.EIGEN_TEST_CENTER, 0])
-        plane_label = th.math(r"\text{multiply by }\Sigma", th.MIN_SIZE, th.COLOR_SIGMA)
-        plane_label.next_to(plane, UP, buff=0.1)
-        readouts = VGroup()
-        drawn = VGroup(plane, plane_label, readouts)
-        self.play(Create(plane), FadeIn(plane_label), run_time=cfg.T_SHORT)
-
-        captions = [
-            "Most directions get rotated.",
-            "This one only stretches.",
-            "And so does this one.",
-        ]
-        caption = question
-        previous = VGroup()
-        for index, (vector, image) in enumerate(
-            zip(cfg.EIGEN_TEST_DIRECTIONS, images, strict=True)
-        ):
-            if index > 0:
-                self.reveal()
-            vector = np.asarray(vector)
-            before = Arrow(plane.c2p(0, 0), plane.c2p(*vector), buff=0, color=th.COLOR_TEXT)
-            after = Arrow(plane.c2p(0, 0), plane.c2p(*image), buff=0, color=th.COLOR_SIGMA)
-            for arrow in (before, after):
-                arrow.set_stroke(width=5)
-            readout = th.math(self._readout_tex(vector, image), th.CAPTION_SIZE)
-            if readouts:
-                readout.next_to(readouts, DOWN, buff=0.3, aligned_edge=LEFT)
-            else:
-                # Below the test plane's top edge would collide with it, so the
-                # readouts start low on the slide, under the Sigma matrix's column.
-                readout.move_to([0, th.EIGEN_READOUT_Y, 0]).align_to(anchor, LEFT)
-            readouts.add(readout)
-            new_caption = th.caption(captions[min(index, len(captions) - 1)])
-            self.play(
-                previous.animate.set_opacity(0.3),
-                GrowArrow(before),
-                FadeIn(readout),
-                swap_caption(caption, new_caption),
-                run_time=cfg.T_SHORT,
-            )
-            self.play(TransformFromCopy(before, after), run_time=cfg.T_MEDIUM)
-            previous = VGroup(before, after)
-            drawn.add(previous)
-            caption = new_caption
-        self.reveal()
-        key = th.math(r"\Sigma\mathbf{v} = \lambda\mathbf{v}", th.BODY_SIZE, th.COLOR_SIGMA)
-        key_box = SurroundingRectangle(key, color=th.COLOR_SIGMA, buff=0.15)
-        VGroup(key, key_box).to_edge(RIGHT, buff=th.EDGE_BUFF).match_y(readouts)
-        key_caption = th.caption(
-            "Directions Σ only stretches: <b>eigenvectors</b>. "
-            "The stretch factors: <b>eigenvalues</b>."
-        )
-        self.play(
-            Write(key),
-            Create(key_box),
-            swap_caption(caption, key_caption),
-            run_time=cfg.T_MEDIUM,
-        )
-        drawn.add(key, key_box)
-        self.eigen_caption = key_caption
-        return drawn
-
-    @staticmethod
-    def _readout_tex(vector: np.ndarray, image: np.ndarray) -> str:
-        """'Sigma (1, 1) = (9, 9) = 9 (1, 1)' if the image is parallel, else 'Sigma v = image'."""
-        tex = rf"\Sigma {fmt_vector(vector)} = {fmt_vector(image)}"
-        cross = vector[0] * image[1] - vector[1] * image[0]
-        if abs(cross) < 1e-9:
-            factor = float(image @ vector / (vector @ vector))
-            tex += rf" = {fmt(factor)} \cdot {fmt_vector(vector)}"
-        return tex
-
-    @staticmethod
-    def _eigen_arrows(sigma: np.ndarray, axes: Axes) -> VGroup:
-        """Both eigenvectors from the center, scaled by k sqrt(lambda), labeled at the tips."""
-        values, vectors = mm.eigen_axes(sigma)
-        group = VGroup()
-        for index, (value, vector) in enumerate(zip(values, vectors.T, strict=True), start=1):
-            tip = cfg.EIGEN_ARROW_K * np.sqrt(value) * vector
-            arrow = Arrow(axes.c2p(0, 0), axes.c2p(*tip), buff=0, color=th.COLOR_TEXT)
-            arrow.set_stroke(width=6)
-            label = th.math(rf"\mathbf{{v}}_{index}", th.CAPTION_SIZE)
-            label.add_background_rectangle(color=th.BACKGROUND, opacity=0.85, buff=0.05)
-            label.next_to(axes.c2p(*tip), normalize(arrow.get_vector()), buff=0.12)
-            group.add(VGroup(arrow, label))
-        return group
-
-    @staticmethod
-    def _eigen_rows(sigma: np.ndarray) -> VGroup:
-        """One row per eigenpair: lambda, its square root, and the unit eigenvector."""
-        values, vectors = mm.eigen_axes(sigma)
-        rows = VGroup(
-            *[
-                th.math(
-                    rf"\lambda_{i} = {fmt(value)},\ \sqrt{{\lambda_{i}}} = {fmt(np.sqrt(value))},"
-                    rf"\ \mathbf{{v}}_{i} \approx {fmt_vector(vector, fixed=True)}",
-                    th.CAPTION_SIZE,
-                )
-                for i, (value, vector) in enumerate(zip(values, vectors.T, strict=True), start=1)
-            ]
-        )
-        return rows.arrange(DOWN, buff=0.35, aligned_edge=LEFT)
-
-    # --- 3.4 -----------------------------------------------------------------
-
-    def slide_3_4_until_it_breaks(self) -> None:
+    def slide_3_3_until_it_breaks(self) -> None:
         """Live rho sweep with the Cholesky pipeline beside it. Point: the pivot decides."""
         self.begin_slide(
             notes="""
-            Let's run the same machine from 2.4 while turning rho up.
+            Let's run the same machine from 2.3 while turning rho up.
             Elimination leaves a second pivot of 1 minus rho squared, and its
             square root is the only entry in G that gives the cloud any
             thickness. At exactly rho equals 1 the pivot hits zero, x2 is just a
@@ -588,7 +374,9 @@ class S3Sampler(DeckSlide):
             FadeIn(gauge_label),
             run_time=cfg.T_SHORT,
         )
-        caption = VGroup()
+        # The bridge from 3.2, which ended on "G's off-diagonal sets the tilt".
+        caption = th.caption("Now push the tilt as far as it goes.")
+        self.play(FadeIn(caption), run_time=cfg.T_SHORT)
         for target in targets:
             self.reveal()
             self.play(
@@ -694,7 +482,7 @@ class S3Sampler(DeckSlide):
         return cloud.set_fill(opacity=th.DOT_OPACITY * fade)
 
     def _pipeline(self, rho: ValueTracker) -> VGroup:
-        """The 2.4 route for [[1, rho], [rho, 1]], recomputed every frame.
+        """The 2.3 route for [[1, rho], [rho, 1]], recomputed every frame.
 
         Rows: Sigma, the elimination step, D, and G with G22 boxed. Live values
         sit on placeholder entries sized for '-0.000'. The returned group has
@@ -751,12 +539,12 @@ class S3Sampler(DeckSlide):
 
 
 class S3bThreeD(ThreeDSlide):
-    """Optional slide 3.5: the 3x3 example from 2.4 in 3D. Rendered only when ENABLE_3D_BONUS."""
+    """Optional slide 3.4: the 3x3 example from 2.3 in 3D. Rendered only when ENABLE_3D_BONUS."""
 
     def construct(self) -> None:
-        self.slide_3_5_three_d_bonus()
+        self.slide_3_4_three_d_bonus()
 
-    def slide_3_5_three_d_bonus(self) -> None:
+    def slide_3_4_three_d_bonus(self) -> None:
         """A 3D N(0, Sigma) cloud with a slow camera orbit. Point: same recipe in 3D."""
         notes = """
             The same recipe works in any dimension. Here is the 3 by 3 Sigma

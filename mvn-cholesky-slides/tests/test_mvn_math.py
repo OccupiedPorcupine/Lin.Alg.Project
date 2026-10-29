@@ -46,16 +46,6 @@ def test_main_factor_is_exact() -> None:
     np.testing.assert_array_equal(mm.cholesky_factor(config.MAIN_SIGMA), [[2.0, 0.0], [1.0, 2.0]])
 
 
-def test_triangle_solve() -> None:
-    assert mm.triangle_solve_2x2(config.MAIN_SIGMA) == (2.0, 1.0, 2.0)
-
-
-def test_g_times_g_is_not_sigma() -> None:
-    chol = mm.cholesky_factor(config.MAIN_SIGMA)
-    np.testing.assert_array_equal(chol @ chol, [[4.0, 0.0], [4.0, 4.0]])
-    assert not np.allclose(chol @ chol, config.MAIN_SIGMA)
-
-
 @pytest.mark.parametrize(
     "sigma", [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.2], [1.2, 1.0]]], ids=["rho=1", "rho=1.2"]
 )
@@ -65,7 +55,7 @@ def test_cholesky_raises_when_not_positive_definite(sigma: list[list[float]]) ->
             factor(sigma)
 
 
-# --- The 2.4 hand route ----------------------------------------------------------
+# --- The 2.3 hand route ----------------------------------------------------------
 
 
 def test_ldl_steps_3x3() -> None:
@@ -84,13 +74,12 @@ def test_ldl_steps_3x3() -> None:
     np.testing.assert_allclose(route.lower @ route.upper, config.EXAMPLE_3X3_SIGMA)
 
 
-def test_direct_steps_3x3() -> None:
-    entries = mm.cholesky_direct_steps(config.EXAMPLE_3X3_SIGMA)
-    order = [(e.row, e.col) for e in entries]
-    assert order == [(0, 0), (1, 0), (2, 0), (1, 1), (2, 1), (2, 2)]
-    assert [e.value for e in entries] == [2.0, 1.0, 1.0, 2.0, 1.0, 1.0]
-    assert entries[-1].subtracted == [1.0, 1.0]  # g33 = sqrt(3 - 1^2 - 1^2)
-    assert entries[4].divisor == 2.0  # g32 = (3 - 1*1) / 2
+def test_main_factor_is_corner_of_3x3_factor() -> None:
+    """Slide 2.4 takes the 2x2 G straight from the corner of the 3x3 G worked out on 2.3."""
+    corner = np.asarray(config.EXAMPLE_3X3_SIGMA)[:2, :2]
+    np.testing.assert_array_equal(corner, config.MAIN_SIGMA)
+    chol_3x3 = mm.ldl_steps(config.EXAMPLE_3X3_SIGMA).chol
+    np.testing.assert_allclose(chol_3x3[:2, :2], mm.cholesky_factor(config.MAIN_SIGMA))
 
 
 # --- Sampling -------------------------------------------------------------------
@@ -158,7 +147,7 @@ def test_elementwise_sqrt_attempt() -> None:
     )
 
 
-# --- Correlation pivot (3.4) ---------------------------------------------------------
+# --- Correlation pivot (3.3) ---------------------------------------------------------
 
 
 def test_unit_corr_pivot() -> None:
@@ -180,7 +169,7 @@ def test_unit_corr_factor_edge_cases() -> None:
     assert mm.unit_corr_factor(1.2) is None
 
 
-# --- Eigen view (3.3) ----------------------------------------------------------------
+# --- Eigen view (appendix A.2) ----------------------------------------------------------------
 
 
 def test_eigen_examples() -> None:
@@ -197,7 +186,7 @@ def test_ellipse_params_axis_aligned() -> None:
     assert angle == pytest.approx(0.0)
 
 
-# --- Applications (1.1 and 4.2) --------------------------------------------------------
+# --- Applications (1.1) --------------------------------------------------------
 
 
 def test_portfolio_risk_ratio() -> None:
@@ -214,14 +203,6 @@ def test_portfolio_risk_ratio() -> None:
 def test_value_at_risk_is_a_loss() -> None:
     returns = mm.portfolio_returns(config.PORTFOLIO_WEIGHTS, 0.0, config.N_STATS, 1)
     assert mm.value_at_risk(returns, config.VAR_LEVEL) < 0
-
-
-def test_rbf_kernel_needs_jitter() -> None:
-    xs = mm.gp_grid(config.GP_X_RANGE, config.GP_N_POINTS)
-    kernel = mm.rbf_kernel(xs, config.GP_LENGTH_SCALE)
-    with pytest.raises(mm.NotPositiveDefiniteError):
-        mm.cholesky_factor(kernel)
-    mm.cholesky_factor(kernel + config.GP_JITTER * np.eye(len(xs)))
 
 
 def test_synth_correlation_is_positive_definite() -> None:

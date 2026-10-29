@@ -2,8 +2,8 @@
 
 The deck as it is now, slide by slide. Each **click** is one press of the
 right arrow in the presenter. Numbers on screen come from `config.py` through
-`mvn_math.py`. 108 clicks in total, about 4 minutes of animation; the talk
-itself runs longer with speaking time.
+`mvn_math.py`. 101 clicks in total (89 before the appendix), about
+3 minutes of animation; the talk itself runs longer with speaking time.
 
 ## How to use this file
 
@@ -21,17 +21,18 @@ implement it. Any of these work:
 Rough wording is fine. The method names in backticks tell Claude which code
 each slide is.
 
-**Notation:** G is always the Cholesky factor (yellow). L only appears on 2.4
-as the unit lower-triangular factor from elimination. A is a general matrix
-on 2.1 to 2.3. Colors: z blue, x orange, Σ teal, G yellow, distance pink,
+**Notation:** G is always the Cholesky factor (yellow). L only appears on 2.2
+and 2.3 as the unit lower-triangular factor from elimination. A is a general
+matrix on 2.1 and 2.2. Colors: z blue, x orange, Σ teal, G yellow, distance pink,
 normalizer grey, failure red, zero pivot amber, confirmation green.
 
-**If the talk runs long, cut in this order:** A.1 (already after the closing
-slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
+**If the talk runs long, cut in this order:** the appendix (A.1, A.2) is
+already after the closing slide; then 1.4; then 3.2's four panels down to two.
+3.4 (the 3D bonus) is off by default.
 
 ---
 
-## Section 1: Problem (`scenes/s1_problem.py`, 31 clicks)
+## Section 1: Problem (`scenes/s1_problem.py`, 30 clicks)
 
 ### 1.0 Title slide
 `slide_1_0_title`
@@ -45,20 +46,18 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
 
 ### 1.1 Hook: where correlated randomness matters
 `slide_1_1_hook`
-- **Point:** all three uses need random numbers that move together. No math yet.
+- **Point:** both uses need random numbers that move together. No math yet.
 - **Clicks:** the title changes to each use case.
   1. **Monte Carlo portfolio risk.** "Stock A vs Stock B returns (simulated)": blue round cloud (ρ = 0) beside orange tilted cloud (ρ = 0.8).
   2. The clouds morph into overlaid histograms of the 50/50 portfolio return, with legend "ρ = 0: sd 0.71, 5% VaR −1.16" and "ρ = 0.8: sd 0.95, 5% VaR −1.56", and red dashed "5% worst case" lines. Caption: "Ignore correlation and you underestimate risk."
-  3. **Gaussian processes.** 60 blue jagged dots morph into a smooth orange curve, three times (earlier curves dim). Caption: "A random smooth curve is one sample from a 60-dimensional normal."
-  4. **Synthetic data generation.** "Original data (illustrative)" heatmap, then "20,000 simulated rows", then the "Synthetic copy" heatmap with measured correlations; 4 synthetic exam-score rows tick in. Caption: "Fake data with real structure: safe to share, useful for testing models."
-  5. Dim overlay: "All three need random numbers / that move together."
+  3. **Synthetic data generation.** "Original data (illustrative)" heatmap, then "20,000 simulated rows", then the "Synthetic copy" heatmap with measured correlations; 4 synthetic exam-score rows tick in. Caption: "Fake data with real structure: safe to share, useful for testing models."
+  4. Dim overlay: "Both need random numbers / that move together."
 
 ### 1.2 What computers give us: N(0, I)
 `slide_1_2_what_computers_give`
 - **Point:** computers give us independent noise; each row is one point.
 - **Clicks:**
-  1. NumPy code with the printed `Z[:3]` rows (generated from the real samples). Each row is highlighted and flies to its blue dot, then the rest of the cloud fills in.
-  2. "each value ~ N(0, 1): φ(z) = e^(−z²/2)/√(2π)", the readout "correlation(z₁, z₂) ≈ 0.00" (from 20,000 samples), then the two-line caption "Each draw is independent of the others. / The two variables are not correlated."
+  1. NumPy code with the printed `Z[:3]` rows (generated from the real samples). Each row is highlighted and flies to its blue dot, then the rest of the cloud fills in. Then "each value ~ N(0, 1): φ(z) = e^(−z²/2)/√(2π)", the readout "correlation(z₁, z₂) ≈ 0.00" (from 20,000 samples), then the two-line caption "Each draw is independent of the others. / The two variables are not correlated."
 
 ### 1.3 What we want: N(μ, Σ)
 `slide_1_3_what_we_want`
@@ -109,7 +108,7 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
 
 ---
 
-## Section 2: Solution (`scenes/s2_solution.py`, 39 clicks)
+## Section 2: Solution (`scenes/s2_solution.py`, 34 clicks)
 
 ### 2.0 Section slide: Solution
 `slide_2_0_section`
@@ -119,7 +118,7 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
 ### 2.1 Key fact: what a matrix does to the spread
 `slide_2_1_key_fact`
 - **Point:** Cov(A z) = A Aᵀ, the nD version of Var(a z) = a².
-- **Clicks:** a legend box (z, A, x) sits in the top-right corner through 2.3.
+- **Clicks:** a legend box (z, A, x) sits in the top-right corner.
   1. Legend: z = (z₁, z₂) the start; A = [[a, b], [c, d]] the "2" in 1D; x = A z what we get. Caption: "We ignore μ here. Shifting moves the cloud but doesn't change its spread, just like in 1D."
   2. "1D: x = a z ⇒ Var(x) = a² ✓" and "nD: x = A z ⇒ spread of x = ?"
   3. x₁ = a z₁ + b z₂, x₂ = c z₁ + d z₂. Caption: "Each new variable is a mix of the two independent ones."
@@ -129,23 +128,18 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
   7. The legend steps aside. Attempt 1 (A = Σ): 20, 29, 18 → [[20, 18], [18, 29]] ✗. Attempt 2 (element-wise root): 6, 7, 2√2 + √10 ✗, with "The off-diagonal √2 leaks into the diagonal: 4 + 2 = 6, not 4." Caption: "The measurements from earlier were right. Now we know why."
   8. The legend returns. "We need A Aᵀ = Σ:" a² + b² = 4, c² + d² = 5, ac + bd = 2. Caption: "Find a, b, c, d. That's what 'square root of a matrix' means."
 
-### 2.2 Many square roots
-`slide_2_2_many_square_roots`
-- **Clicks:**
-  1. σ · σ = σ² ⟷ A Aᵀ = Σ.
-  2. (AQ)(AQ)ᵀ = A QQᵀ Aᵀ = A Aᵀ ("Q any rotation"). The blue cloud rotates 90° and stays round. Caption: "Many square roots exist. We need a rule to pick one."
+### 2.2 The plan: Cholesky decomposition
+`slide_2_2_cholesky_plan`
+- **Point:** 3 equations, 4 unknowns, so we get one free choice; Cholesky makes A lower triangular (G) and finds it in four steps.
+- **Clicks:** the legend leaves.
+  1. "A Aᵀ = Σ: 3 equations, 4 unknowns. One free choice." and "Cholesky's choice: b = 0. The lower-triangular A is called G." Beside it A = [[a, b], [c, d]]: b turns into a grey 0 and A turns yellow and becomes G. Boxed: Σ = G Gᵀ.
+  2. "1. Σ = L U", with "eliminate: L stores the multipliers".
+  3. "2. Σ = L D V", with "pull the pivots out of U into D".
+  4. "3. Σ = L D Lᵀ", with "symmetry gives V = Lᵀ".
+  5. "4. Σ = (L√D)(L√D)ᵀ = G Gᵀ", with "split D in half: G = L√D". Caption: "Needs every pivot > 0. Next: each step by hand on a 3×3."
 
-### 2.3 The rule: force a triangle (Cholesky)
-`slide_2_3_force_a_triangle`
-- **Clicks:**
-  1. b is greyed to 0; solve a² = 4 → a = 2, then c = 1, then d = 2, each filling A in yellow; A becomes G = [[2, 0], [1, 2]]. Boxed: "Cholesky: Σ = G Gᵀ, G lower triangular". Caption: "Force the top-right to zero: the equations solve one at a time."
-  2. "1. Unique (with a positive diagonal)."
-  3. "2. Exists exactly when Σ is symmetric positive definite."
-  4. "3. Fast (about n³/3 operations) and numerically stable."
-  5. "Why not just A·A = Σ?": G G = [[4, 0], [4, 4]] ≠ Σ ✗, G Gᵀ = Σ ✓. Caption: "The data follows A Aᵀ, so that's the test."
-
-### 2.4a By hand, step 1: LU (ordinary elimination)
-`slide_2_4a_lu`
+### 2.3a By hand, step 1: LU (ordinary elimination)
+`slide_2_3a_lu`
 - **Clicks:** Σ = [[4, 2, 2], [2, 5, 3], [2, 3, 3]].
   1. Σ and L = [[1, 0, 0], [?, 1, 0], [?, ?, 1]].
   2. Pivot 4 boxed; R2 ← R2 − ½R1 → [0, 4, 2]; the ½ flies into L.
@@ -153,21 +147,21 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
   4. Pivot 4 boxed; R3 ← R3 − ½R2 → [0, 0, 1].
   5. The matrix becomes U; "Σ = L U". Caption: "L records the multipliers. U is what's left after elimination."
 
-### 2.4b Step 2: LDV (pull the pivots out)
-`slide_2_4b_ldv`
+### 2.3b Step 2: LDV (pull the pivots out)
+`slide_2_3b_ldv`
 - **Clicks:**
   1. U with its pivots 4, 4, 1 boxed ("pivots").
   2. "Divide each row of U by its pivot": U = D V, then "Σ = L D V". Caption: "Same factorization, with the pivots separated out."
 
-### 2.4c Step 3: LDLᵀ (symmetry gives V for free)
-`slide_2_4c_ldlt`
+### 2.3c Step 3: LDLᵀ (symmetry gives V for free)
+`slide_2_3c_ldlt`
 - **Clicks:**
   1. L and V side by side.
   2. A copy of L flips (transpose) and lands on V; green box, "V = Lᵀ".
   3. "Σ = Σᵀ = (LDV)ᵀ = Vᵀ D Lᵀ", "The factorization is unique, so V = Lᵀ.", then "Σ = L D Lᵀ". Caption: "Symmetric matrix, symmetric factorization."
 
-### 2.4d Step 4: split D in half, giving G Gᵀ
-`slide_2_4d_split_d`
+### 2.3d Step 4: split D in half, giving G Gᵀ
+`slide_2_3d_split_d`
 - **Clicks:**
   1. D = √D √D with √D = diag(2, 2, 1).
   2. Σ = L√D √D Lᵀ = (L√D)(L√D)ᵀ = G Gᵀ.
@@ -175,18 +169,11 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
   4. G Gᵀ = Σ ✓. Caption: "Cholesky is just LDLᵀ with the pivots square-rooted."
   5. Dim overlay, boxed: "Cholesky needs every pivot to be strictly positive. / That's exactly what 'positive definite' means." Below: "For [[1, ρ], [ρ, 1]], the pivots are 1 and 1 − ρ². / Watch that second one: it comes back when we push ρ to 1."
 
-### 2.4e The shortcut: solve for G directly
-`slide_2_4e_shortcut`
-- **Clicks:**
-  1. G Gᵀ multiplied out symbolically = Σ, and an empty G of g_ij entries.
-  2. g₁₁ = √4 = 2, g₂₁ = 2/2 = 1, g₃₁ = 2/2 = 1, g₂₂ = √(5 − 1²) = 2, g₃₂ = (3 − 1·1)/2 = 1, g₃₃ = √(3 − 1² − 1²) = 1, each boxing its entries and filling G. Caption: "Same G, without the detour. The triangle trick, one column at a time."
-  3. The general formulas for g_jj and g_ij, with "Diagonal: what's left of the variance, square-rooted." and "Below: what's left of the covariance, divided by the diagonal."
-
-### 2.5 The algorithm and the hero animation
-`slide_2_5_algorithm_and_hero`
+### 2.4 The algorithm and the hero animation
+`slide_2_4_algorithm_and_hero`
 - **Point:** four steps; G literally reshapes the plane.
 - **Clicks:**
-  1. "Back to our 2×2: G = [[2, 0], [1, 2]]" and the algorithm box: 1. Choose μ and Σ. 2. G = chol(Σ). 3. z ~ N(0, I). 4. x = μ + G z.
+  1. The 3×3 G from 2.3 with its top-left 2×2 corner boxed, "our 2×2 is the top-left corner", an arrow to G = [[2, 0], [1, 2]]; beside it the algorithm box: 1. Choose μ and Σ. 2. G = chol(Σ). 3. z ~ N(0, I). 4. x = μ + G z.
   2. Plane, grid, blue cloud, tracked point z = (0.5, −1); side panel x = μ + G z with the actual G and μ.
   3. "Step 1: apply G": the grid shears; the point moves to Gz = (1, −1.5).
   4. "Step 2: shift by μ": everything shifts, blue fades to orange, the point lands at x = (2, 0.5) with dashed guides.
@@ -194,20 +181,20 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
 
 ---
 
-## Section 3: Putting the sampler to work (`scenes/s3_sampler.py`, 26 clicks)
+## Section 3: Putting the sampler to work (`scenes/s3_sampler.py`, 19 clicks)
 
 ### 3.0 Section slide: Putting the sampler to work
 `slide_3_0_section`
 - **Clicks:**
-  1. Opens on 2.5's final frame, which dims; the card appears on top: "3", "Putting the sampler to work", "Brief part (b): change Σ, watch the data".
+  1. Opens on 2.4's final frame, which dims; the card appears on top: "3", "Putting the sampler to work", "Brief part (b): change Σ, watch the data".
 
 ### 3.1 Does it work?
 `slide_3_1_does_it_work`
-- **Clicks:** the orange cloud from 2.5 stays on screen.
+- **Clicks:** the orange cloud from 2.4 stays on screen.
   1. The card lifts; the grid, point, guides and code fade; the plane and cloud move left. Caption: "We built a sampler. Does it really produce Σ?"
   2. Target Σ and μ beside Σ̂ and μ̂ from 20,000 samples (2 decimals); matching entries flash green.
   3. The 1σ and 2σ contours.
-  4. The 3×3 check: G from 2.4 run through the sampler; Σ beside the measured Σ̂ (flash green). Caption: "The G we computed by hand generates exactly the Σ we asked for."
+  4. The 3×3 check: G from 2.3 run through the sampler; Σ beside the measured Σ̂ (flash green). Caption: "The G we computed by hand generates exactly the Σ we asked for."
 
 ### 3.2 Turning the dial: brief part (b)
 `slide_3_2_turning_the_dial`
@@ -219,22 +206,11 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
   5. Negative ρ = −0.8: "Flip its sign, flip the tilt."
   6. "G's diagonal sets the spread. G's off-diagonal sets the tilt."
 
-### 3.3 The eigen view: reading the shape
-`slide_3_3_eigen_view`
-- **Clicks:**
-  1. Σ = [[5, 4], [4, 5]] and its cloud. "Which directions does this cloud stretch along, and by how much?"
-  2. A small test plane: (1, 0) → (5, 4). "Most directions get rotated."
-  3. (1, 1) → (9, 9) = 9·(1, 1). "This one only stretches."
-  4. (1, −1) → (1, −1) = 1·(1, −1). "And so does this one."
-  5. Boxed: Σ v = λ v. "Directions Σ only stretches: eigenvectors. The stretch factors: eigenvalues."
-  6. The 2σ ellipse with eigenvector arrows of length 2√λ (6 and 2) landing on its axes, plus λ, √λ, v rows. "...√eigenvalues set the spread: 3 one way, 1 the other."
-  7. Morph to [[8, 2], [2, 5]]: cloud, ellipse and arrows follow live. "Not just a 45° trick: eigenvalues 9 and 4, so spreads 3 and 2."
-
-### 3.4 Turning the dial until it breaks
-`slide_3_4_until_it_breaks`
+### 3.3 Turning the dial until it breaks
+`slide_3_3_until_it_breaks`
 - **Point:** positive pivots work, a zero pivot collapses the data, a negative pivot is impossible.
 - **Clicks:** live cloud (fixed z) on the left; live Cholesky pipeline on the right (Σ, elimination row [0, 1 − ρ²], D, G with G₂₂ boxed "the only entry giving the cloud its thickness", and the pivot gauge).
-  1. ρ = 0.
+  1. ρ = 0. Caption: "Now push the tilt as far as it goes."
   2. ρ → −0.9
   3. ρ → 0
   4. ρ → 0.99
@@ -243,15 +219,15 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
   7. ρ = 1.2: the cloud fades out, pivot −0.44, gauge red, G₂₂ = √−0.44 in red. "No data in the world has this covariance."
   8. Summary box: "Positive pivots: Cholesky works. / Zero pivot: the data collapses. / Negative pivot: the Σ is impossible."
 
-### 3.5 Bonus: the same recipe in 3D (off by default)
-`slide_3_5_three_d_bonus` in class `S3bThreeD`; only shown when `ENABLE_3D_BONUS = True` in `config.py`.
+### 3.4 Bonus: the same recipe in 3D (off by default)
+`slide_3_4_three_d_bonus` in class `S3bThreeD`; only shown when `ENABLE_3D_BONUS = True` in `config.py`.
 - **Clicks:**
-  1. The 3D cloud for the 3×3 Σ from 2.4.
+  1. The 3D cloud for the 3×3 Σ from 2.3.
   2. A slow camera orbit.
 
 ---
 
-## Section 4: Wrap-up (`scenes/s4_wrapup.py`, 12 clicks)
+## Section 4: Wrap-up (`scenes/s4_wrapup.py`, 18 clicks)
 
 ### 4.0 Section slide: Wrap-up
 `slide_4_0_section`
@@ -263,20 +239,15 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
 - **Clicks:**
   1. "Cholesky turns independent noise / into the correlation structure you chose." Blue N(0, I) cloud, yellow arrow x = μ + G z, orange N(μ, Σ) cloud with its 2σ ellipse.
 
-### 4.2 Bookend: the smooth curves, explained
-`slide_4_2_bookend`
-- **Clicks:**
-  1. "x = G z, where G is the 60 × 60 Cholesky factor of the kernel", then the same three jagged-to-smooth morphs as 1.1 (same z vectors). Caption: "Same trick, 60 dimensions instead of 2."
-
-### 4.3 Limits, and what we've already seen
-`slide_4_3_limits`
+### 4.2 Limits, and what we've already seen
+`slide_4_2_limits`
 - **Clicks:** one point per click; the previous point dims.
-  1. "Needs strictly positive pivots." "At ρ = 1 the pivot is 0 and Cholesky stops." Thumbnail of the 3.4 gauge at pivot 0 (amber).
-  2. "Alternatives: eigendecomposition and SVD." "ρ = 1: λ = 2 and 0, √0 = 0 is fine (eigen view)", "NumPy's multivariate_normal defaults to SVD. Slower."
+  1. "Needs strictly positive pivots." "At ρ = 1 the pivot is 0 and Cholesky stops." Thumbnail of the 3.3 gauge at pivot 0 (amber).
+  2. "Alternatives: eigendecomposition and SVD." "ρ = 1: λ = 2 and 0, √0 = 0 is fine (appendix)", "NumPy's multivariate_normal defaults to SVD. Slower."
   3. "Gaussian only." "Real returns have fat tails: the portfolio risk can still be understated." "Fixes (multivariate t, copulas) still use x = μ + G z". Thumbnail of the 1.1 histogram with its VaR line, tagged "from the start".
 
-### 4.4 Closing
-`slide_4_4_closing`
+### 4.3 Closing
+`slide_4_3_closing`
 - **Clicks:**
   1. "Thank you", "Questions?"
 
@@ -288,3 +259,14 @@ slide), 1.4, 2.4e, 3.3 (then drop "(eigen view)" on 4.3), 3.5 (off by default).
   3. ‖G⁻¹(x − μ)‖² = (x − μ)ᵀ Σ⁻¹ (x − μ)
   4. "Together: exactly the density we started with."
   5. Check box at x = (2, 0.5) from z = (0.5, −1): quadratic form = 1.25, ‖z‖² = 1.25, f(x) ≈ 0.0213. Caption: "One equation derives the distribution and generates the data."
+
+### A.2 Appendix (backup): the eigen view
+`slide_a_2_eigen_view`
+- **Clicks:**
+  1. Σ = [[5, 4], [4, 5]] and its cloud. "Which directions does this cloud stretch along, and by how much?"
+  2. A small test plane: (1, 0) → (5, 4). "Most directions get rotated."
+  3. (1, 1) → (9, 9) = 9·(1, 1). "This one only stretches."
+  4. (1, −1) → (1, −1) = 1·(1, −1). "And so does this one."
+  5. Boxed: Σ v = λ v. "Directions Σ only stretches: eigenvectors. The stretch factors: eigenvalues."
+  6. The 2σ ellipse with eigenvector arrows of length 2√λ (6 and 2) landing on its axes, plus λ, √λ, v rows. "...√eigenvalues set the spread: 3 one way, 1 the other."
+  7. Morph to [[8, 2], [2, 5]]: cloud, ellipse and arrows follow live. "Not just a 45° trick: eigenvalues 9 and 4, so spreads 3 and 2."
