@@ -157,9 +157,15 @@ class S3Sampler(DeckSlide):
         samples = mm.transform(self.z_stats, cfg.MAIN_MU, self.main_chol)
         table = self._target_vs_measured(samples).move_to([3.2, 0.2, 0])
         self.play(FadeIn(table[:2]), FadeIn(table[2]), FadeIn(table[4]), run_time=cfg.T_SHORT)
-        self.play(FadeIn(table[3], shift=0.2 * LEFT), FadeIn(table[5], shift=0.2 * LEFT))
         self.play(
-            *self._flash_matches(table[2], table[3]), *self._flash_matches(table[4], table[5])
+            FadeIn(table[3], shift=0.2 * LEFT),
+            FadeIn(table[5], shift=0.2 * LEFT),
+            run_time=cfg.T_SHORT,
+        )
+        self.play(
+            *self._flash_matches(table[2], table[3]),
+            *self._flash_matches(table[4], table[5]),
+            run_time=cfg.T_SHORT,
         )
         self.reveal()
 
@@ -175,7 +181,7 @@ class S3Sampler(DeckSlide):
         self.play(FadeOut(table), run_time=cfg.T_SHORT)
         self.play(FadeIn(check[0]), FadeIn(check[1]), run_time=cfg.T_MEDIUM)
         self.play(FadeIn(check[2]), FadeIn(check[3], shift=0.2 * LEFT), run_time=cfg.T_MEDIUM)
-        self.play(*self._flash_matches(check[2], check[3]))
+        self.play(*self._flash_matches(check[2], check[3]), run_time=cfg.T_SHORT)
         self.play(
             FadeOut(bridge),
             FadeIn(th.caption("The G we computed by hand generates exactly the Σ we asked for.")),
@@ -368,7 +374,7 @@ class S3Sampler(DeckSlide):
         question = th.caption("Which directions does this cloud stretch along, and by how much?")
 
         self.play(FadeIn(title), Create(axes), FadeIn(sigma_block), run_time=cfg.T_SHORT)
-        self.play(fade_in_cloud(cloud), FadeIn(question))
+        self.play(fade_in_cloud(cloud), FadeIn(question), run_time=cfg.T_MEDIUM)
         self.reveal()
 
         tests = self._direction_tests(sigma, sigma_block, question)
@@ -575,7 +581,13 @@ class S3Sampler(DeckSlide):
 
         self.play(FadeIn(title), Create(axes), run_time=cfg.T_SHORT)
         self.add(cloud)
-        self.play(FadeIn(cloud), FadeIn(pipeline), FadeIn(gauge), FadeIn(gauge_label))
+        self.play(
+            FadeIn(cloud),
+            FadeIn(pipeline),
+            FadeIn(gauge),
+            FadeIn(gauge_label),
+            run_time=cfg.T_SHORT,
+        )
         caption = VGroup()
         for target in targets:
             self.reveal()

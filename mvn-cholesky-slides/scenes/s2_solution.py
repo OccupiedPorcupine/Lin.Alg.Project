@@ -395,7 +395,9 @@ class S2Solution(DeckSlide):
         leak.next_to(blocks, DOWN, buff=0.25).align_to(title, LEFT)
         for (label, cross), (a_block, lines, result) in blocks:
             self.play(FadeIn(label), FadeIn(a_block), run_time=cfg.T_SHORT)
-            self.play(LaggedStart(*[Write(line) for line in lines], lag_ratio=0.5))
+            self.play(
+                LaggedStart(*[Write(line) for line in lines], lag_ratio=0.5), run_time=cfg.T_SHORT
+            )
             self.play(FadeIn(result), Create(cross), run_time=cfg.T_SHORT)
         self.play(FadeIn(leak), run_time=cfg.T_SHORT)
         self.play(
@@ -516,7 +518,7 @@ class S2Solution(DeckSlide):
         self.reveal()
 
         self.play(Write(rotation), FadeIn(rotation_note), run_time=cfg.T_MEDIUM)
-        self.play(Create(axes), fade_in_cloud(cloud), Create(unit_circle))
+        self.play(Create(axes), fade_in_cloud(cloud), Create(unit_circle), run_time=cfg.T_MEDIUM)
         self.play(FadeIn(marker, scale=2), FadeIn(rotate_label), run_time=cfg.T_SHORT)
         self.play(
             Rotate(
@@ -1199,7 +1201,7 @@ class S2Solution(DeckSlide):
             step.next_to(side, DOWN, buff=0.6)
 
         self.play(Create(plane), FadeIn(side), run_time=cfg.T_MEDIUM)
-        self.play(Create(grid), fade_in_cloud(cloud))
+        self.play(Create(grid), fade_in_cloud(cloud), run_time=cfg.T_MEDIUM)
         self.play(FadeIn(marker, scale=2), FadeIn(label), run_time=cfg.T_SHORT)
         self.reveal()
 

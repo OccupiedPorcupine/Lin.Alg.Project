@@ -47,6 +47,7 @@ is no need to activate the environment for `make` commands.
 | `make s3` | Render one section (`s1` to `s4`); add `QUALITY=h` for 1080p and `FPS=30` for 30 fps. |
 | `make present` | Open the presenter. Right arrow or space: next. Left: back. |
 | `make html` | Export `slides.html`, one self-contained file as a backup. |
+| `make pptx` | Export `slides.pptx`: one slide per click, each a full-screen video that plays when you advance, with the speaker notes. Text is not editable in PowerPoint (change the scene and re-export), going back replays a slide from its start, and Google Slides drops the videos. |
 | `make notes` | Rebuild `notes/speaker_notes.md` from the scenes. |
 | `make lint` | Run ruff checks and the formatter check. |
 
@@ -154,8 +155,13 @@ you forget). Keep them free of em dashes; a test checks that too.
 **Re-render just one section.** `make s2` (480p) or `make s2 QUALITY=h` (1080p).
 `make present` always uses whatever was rendered last for each section.
 
-**Change timing.** `T_SHORT`, `T_MEDIUM`, `T_LONG` and
-`RHO_SWEEP_SECONDS_PER_LEG` in `config.py`.
+**Change timing.** For the overall pace, change `SPEED_UP` near the top of
+`config.py`: every animation duration is divided by it (3 means three times
+faster than the base values). To retime one kind of step, change its base
+value: `T_SHORT`, `T_MEDIUM`, `T_LONG`, `RHO_SWEEP_SECONDS_PER_LEG` or
+`THREE_D_ROTATION_SECONDS`. Give every new `self.play(...)` an explicit
+`run_time=cfg.T_...`; without one Manim uses a fixed 1 second that
+`SPEED_UP` cannot reach.
 
 **Turn on the 3D bonus slide (3.5).** Set `ENABLE_3D_BONUS = True` in
 `config.py`. The Makefile then renders `S3bThreeD` (the 3D cloud of

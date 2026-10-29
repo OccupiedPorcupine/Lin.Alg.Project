@@ -10,6 +10,7 @@
 # Every render shows a progress bar; Manim's full output goes to media/render.log.
 #   make present       open the presenter
 #   make html          export a single self-contained slides.html
+#   make pptx          export slides.pptx (one auto-playing video per slide)
 #   make notes         rebuild notes/speaker_notes.md from the scenes
 
 VENV ?= .venv
@@ -27,7 +28,7 @@ RENDER = $(PYTHON) tools/render.py --quality=$(QUALITY) $(if $(FPS),--fps $(FPS)
 BONUS := $(shell $(PYTHON) -c "import config; print(int(config.ENABLE_3D_BONUS))")
 SCENES := S1Problem S2Solution S3Sampler $(if $(filter 1,$(BONUS)),S3bThreeD) S4WrapUp
 
-.PHONY: test lint render-low render-fast render s1 s2 s3 s3b s4 present html notes clean
+.PHONY: test lint render-low render-fast render s1 s2 s3 s3b s4 present html pptx notes clean
 
 test:
 	$(PYTHON) -m pytest -q
@@ -61,8 +62,11 @@ present:
 html:
 	$(SLIDES) convert $(SCENES) slides.html --one-file
 
+pptx:
+	$(SLIDES) convert $(SCENES) slides.pptx
+
 notes:
 	$(PYTHON) notes/build_notes.py
 
 clean:
-	rm -rf media slides slides.html
+	rm -rf media slides slides.html slides.pptx

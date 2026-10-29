@@ -9,6 +9,10 @@ every slide that depends on it (matrices, readouts, axis ranges) updates.
 PRESENTER_NAME = "Presenter name"  # shown on the title slide
 RANDOM_SEED = 42  # one seed for the whole deck, so every render is identical
 
+# --- Overall pace ------------------------------------------------------------
+
+SPEED_UP = 3.0  # every animation duration below is divided by this; raise it to speed the deck up
+
 # --- Sample sizes ------------------------------------------------------------
 
 N_DISPLAY = 800  # dots actually drawn on screen (Manim gets slow with thousands of Dots)
@@ -100,7 +104,7 @@ EIGEN_ARROW_K = 2.0  # eigenvector arrows are scaled by k * sqrt(lambda)
 # --- 3.4 correlation sweep until it breaks -----------------------------------
 
 RHO_SWEEP_PATH = [0.0, -0.9, 0.0, 0.99, 0.999]  # values visited in order
-RHO_SWEEP_SECONDS_PER_LEG = 6.0  # seconds spent moving between two values
+RHO_SWEEP_SECONDS_PER_LEG = 6.0 / SPEED_UP  # seconds spent moving between two values
 RHO_ZERO_PIVOT = 1.0  # the pivot 1 - rho^2 is exactly zero here
 RHO_NEGATIVE_PIVOT = 1.2  # the pivot is negative here: no such data exists
 ENABLE_NEGATIVE_PIVOT_REVEAL = True  # show the rho = 1.2 step
@@ -127,11 +131,11 @@ DENSITY_DECIMALS = 4  # the density value in the appendix is small, so it gets m
 ENABLE_3D_BONUS = False  # optional stretch slide, see 3.5; uses EXAMPLE_3X3_SIGMA
 N_DISPLAY_3D = 400  # 3D dots are spheres, much slower to draw than 2D dots
 THREE_D_ROTATION_DEGREES = 120.0  # how far the camera orbits
-THREE_D_ROTATION_SECONDS = 16.0  # duration of the slow camera rotation
+THREE_D_ROTATION_SECONDS = 16.0 / SPEED_UP  # duration of the slow camera rotation
 
-# --- Animation timing constants (seconds) ------------------------------------
+# --- Animation timing constants (seconds, before SPEED_UP) -------------------
 
-T_SHORT = 1.2  # small reveals: a caption, a check mark
-T_MEDIUM = 2.4  # standard reveals: a matrix, a cloud
-T_LONG = 5.0  # big moments: the hero transform, curve stretches
-T_SETTLE = 0.1  # hold at the end of each slide so it ends on the exact final frame
+T_SHORT = 1.2 / SPEED_UP  # small reveals: a caption, a check mark
+T_MEDIUM = 2.4 / SPEED_UP  # standard reveals: a matrix, a cloud
+T_LONG = 5.0 / SPEED_UP  # big moments: the hero transform, curve stretches
+T_SETTLE = 0.1  # hold at the end of each slide so it ends on the exact final frame (not scaled)

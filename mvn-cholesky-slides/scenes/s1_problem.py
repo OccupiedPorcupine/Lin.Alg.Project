@@ -196,7 +196,7 @@ class S1Problem(DeckSlide):
         self.play(
             *[FadeIn(VGroup(p.axes, p.label, p.labels)) for p in panels], run_time=cfg.T_SHORT
         )
-        self.play(*[fade_in_cloud(p.cloud) for p in panels])
+        self.play(*[fade_in_cloud(p.cloud) for p in panels], run_time=cfg.T_MEDIUM)
         self.reveal()
 
         # Same z for both rho values, so the histograms differ only by correlation.
@@ -444,7 +444,7 @@ class S1Problem(DeckSlide):
             self.play(ReplacementTransform(line.copy(), dot), FadeOut(box), run_time=cfg.T_SHORT)
             flown.add(dot)
         regular = make_point_cloud(shown, axes, th.COLOR_Z)
-        self.play(Transform(flown, regular), fade_in_cloud(rest))
+        self.play(Transform(flown, regular), fade_in_cloud(rest), run_time=cfg.T_MEDIUM)
         self.play(Write(one_d), run_time=cfg.T_MEDIUM)
         self.play(FadeIn(readout), run_time=cfg.T_SHORT)
         self.play(FadeIn(caption), run_time=cfg.T_SHORT)
@@ -486,7 +486,7 @@ class S1Problem(DeckSlide):
         self.play(FadeIn(title), FadeIn(blue), run_time=cfg.T_MEDIUM)
         self.play(Transform(blue, thumb_target), FadeIn(blue_label), run_time=cfg.T_MEDIUM)
         self.play(Create(target_axes), run_time=cfg.T_SHORT)
-        self.play(fade_in_cloud(target_cloud), FadeIn(target_label))
+        self.play(fade_in_cloud(target_cloud), FadeIn(target_label), run_time=cfg.T_MEDIUM)
         self.reveal()
 
         sigma = np.asarray(cfg.MAIN_SIGMA)
@@ -526,7 +526,9 @@ class S1Problem(DeckSlide):
             "μ says where the cloud sits. Σ says how wide it is and which way it tilts."
         )
 
-        self.play(FadeIn(mu_block), FadeIn(center, scale=2), FadeIn(center_label))
+        self.play(
+            FadeIn(mu_block), FadeIn(center, scale=2), FadeIn(center_label), run_time=cfg.T_SHORT
+        )
         self.play(FadeIn(sigma_block), run_time=cfg.T_SHORT)
         self.play(Create(diagonal_boxes), FadeIn(notes_text[0]), run_time=cfg.T_MEDIUM)
         self.play(Create(off_diagonal_boxes), FadeIn(notes_text[1]), run_time=cfg.T_MEDIUM)
@@ -677,7 +679,12 @@ class S1Problem(DeckSlide):
         contour_caption = th.caption(
             "Every point on one ellipse has the same distance, so the same density."
         )
-        self.play(Create(contours), FadeOut(ruler), swap_caption(caption, contour_caption))
+        self.play(
+            Create(contours),
+            FadeOut(ruler),
+            swap_caption(caption, contour_caption),
+            run_time=cfg.T_SHORT,
+        )
         self.reveal()
 
         final = th.caption(
@@ -783,8 +790,10 @@ class S1Problem(DeckSlide):
         caption = th.caption("How do we turn N(0, I) into N(μ, Σ)?")
 
         self.play(FadeIn(title), Create(left_axes), Create(right_axes), run_time=cfg.T_SHORT)
-        self.play(fade_in_cloud(left_cloud), FadeIn(left_label))
-        self.play(fade_in_cloud(right_cloud), Create(ellipse), FadeIn(right_label))
+        self.play(fade_in_cloud(left_cloud), FadeIn(left_label), run_time=cfg.T_MEDIUM)
+        self.play(
+            fade_in_cloud(right_cloud), Create(ellipse), FadeIn(right_label), run_time=cfg.T_MEDIUM
+        )
         self.play(GrowArrow(arrow), Write(question), run_time=cfg.T_MEDIUM)
         self.play(FadeIn(caption), run_time=cfg.T_SHORT)
 
@@ -866,7 +875,9 @@ class S1Problem(DeckSlide):
         self.play(Transform(equation, naive_equation), FadeIn(caption), run_time=cfg.T_SHORT)
         self.play(scale.animate.set_value(naive), run_time=cfg.T_LONG)
         self.wait(cfg.T_SETTLE, frozen_frame=False)
-        self.play(variance_value.animate.set_color(th.COLOR_BAD), Create(cross))
+        self.play(
+            variance_value.animate.set_color(th.COLOR_BAD), Create(cross), run_time=cfg.T_SHORT
+        )
         self.reveal()
 
         why = th.math(r"\mathrm{Var}(a z) = a^2\, \mathrm{Var}(z)")
@@ -887,7 +898,9 @@ class S1Problem(DeckSlide):
         )
         self.play(scale.animate.set_value(sd), run_time=cfg.T_LONG)
         self.wait(cfg.T_SETTLE, frozen_frame=False)
-        self.play(variance_value.animate.set_color(th.COLOR_GOOD), Create(check))
+        self.play(
+            variance_value.animate.set_color(th.COLOR_GOOD), Create(check), run_time=cfg.T_SHORT
+        )
         self.reveal()
 
         shifted = th.math(rf"x = {fmt(mu)} + {fmt(sd)}z", color=th.COLOR_X)
@@ -1105,7 +1118,7 @@ class S1Problem(DeckSlide):
         axes, cloud, target_ellipse = plot
         self.play(FadeIn(guess), run_time=cfg.T_MEDIUM)
         self.play(GrowArrow(arrow_in), Create(axes), run_time=cfg.T_SHORT)
-        self.play(fade_in_cloud(cloud))
+        self.play(fade_in_cloud(cloud), run_time=cfg.T_MEDIUM)
         self.play(Create(target_ellipse), run_time=cfg.T_SHORT)  # on top of the dots
         self.play(GrowArrow(arrow_out), FadeIn(measured), run_time=cfg.T_MEDIUM)
         self.play(Create(cross), run_time=cfg.T_SHORT)

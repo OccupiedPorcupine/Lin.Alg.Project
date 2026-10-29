@@ -2,7 +2,7 @@
 
 The deck as it is now, slide by slide. Each **click** is one press of the
 right arrow in the presenter. Numbers on screen come from `config.py` through
-`mvn_math.py`. 108 clicks in total, about 13 minutes of animation; the talk
+`mvn_math.py`. 108 clicks in total, about 4 minutes of animation; the talk
 itself runs longer with speaking time.
 
 ## How to use this file
