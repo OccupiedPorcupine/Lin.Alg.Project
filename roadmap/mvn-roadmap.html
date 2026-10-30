@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1080">
+<title>Multivariate Normal Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --card: #141416;
+    --border: #2a2a2e;
+    --ink: #e6e6e9;
+    --ink2: #c4c4ca;
+    --grey: #8a8a92;
+    --amber: #f5b301;
+    --teal: #3ad6c5;
+    --violet: #8b7cf6;
+    --orange: #f0883e;
+    --red: #ff5c5c;
+    --green: #4ade80;
+    --track: #3a3a40;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1080px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Inter, system-ui, sans-serif;
+    padding: 40px 28px 36px;
+  }
+
+  /* ---------- title ---------- */
+  .kicker {
+    font-family: "Archivo Black", Inter, sans-serif;
+    font-size: 30px;
+    letter-spacing: 0.04em;
+    color: var(--ink2);
+    line-height: 1;
+  }
+  .title {
+    font-family: "Archivo Black", Inter, sans-serif;
+    font-size: 72px;
+    line-height: 0.95;
+    color: #fff;
+    margin-top: 8px;
+    letter-spacing: -0.01em;
+  }
+  .byline {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px;
+    color: var(--grey);
+    margin-top: 12px;
+  }
+  .byline b { color: var(--amber); font-weight: 500; }
+
+  /* ---------- roadmap strip ---------- */
+  .strip { position: relative; margin: 28px 0 30px; padding-right: 26px; }
+  .row { position: relative; display: flex; gap: 6px; height: 104px; }
+  .row + .row { margin-top: 16px; }
+  .row.reverse { flex-direction: row-reverse; }
+  .row::before {               /* the track through the node centres */
+    content: ""; position: absolute; left: 4px; right: -26px; top: 52px;
+    height: 2px; background: var(--track);
+  }
+  .row.reverse::before { left: 18px; }
+  .stage {
+    position: relative; flex: var(--n) 1 0;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid #1f1f23; border-radius: 8px;
+    padding: 6px 4px 0;
+  }
+  .stage .q {
+    font-size: 12px; font-weight: 500; color: var(--ink2);
+    text-align: center; line-height: 1.25; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .stage .nodes { display: flex; justify-content: space-around; margin-top: 3px; }
+  .row.reverse .stage .nodes { flex-direction: row-reverse; }
+  .node { width: 74px; display: flex; flex-direction: column; align-items: center; }
+  .node .dot {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--bg); border: 1.5px solid var(--amber);
+    font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 700;
+    color: var(--amber); display: flex; align-items: center; justify-content: center;
+    position: relative; z-index: 1;
+  }
+  .node .lbl {
+    font-family: "JetBrains Mono", monospace; font-size: 10px; color: #a3a3ab;
+    text-align: center; line-height: 1.2; margin-top: 4px;
+  }
+  .turn {                      /* serpentine bend from row 1 into row 2 */
+    position: absolute; right: 0; top: 52px; width: 26px; height: 122px;
+    border: 2px solid var(--track); border-left: none; border-radius: 0 26px 26px 0;
+  }
+  .start, .flag { position: absolute; z-index: 1; }
+  .start { left: 0; top: 48px; width: 10px; height: 10px; border-radius: 50%; background: var(--grey); }
+  .flag { left: 2px; top: 162px; width: 0; height: 0;
+    border-top: 7px solid transparent; border-bottom: 7px solid transparent;
+    border-right: 13px solid var(--green); }
+
+  /* ---------- grid ---------- */
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 14px; }
+  .head {
+    display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px;
+    font-size: 13.5px; line-height: 1.1;
+  }
+  .head .n { color: var(--amber); font-weight: 700; font-family: "JetBrains Mono", monospace; font-size: 13px; }
+  .head .l { color: var(--ink2); font-weight: 500; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; aspect-ratio: 4 / 3;
+  }
+  .card svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+  /* SVG vocabulary */
+  svg text { font-family: "JetBrains Mono", monospace; font-size: 10px; fill: var(--ink); }
+  svg .s { font-size: 9.5px; }
+  svg .xs { font-size: 9px; }
+  svg .big { font-size: 15px; font-weight: 700; }
+  svg .md { font-size: 12px; }
+  svg .b { font-weight: 700; }
+  .a { fill: var(--amber); } .t { fill: var(--teal); } .v { fill: var(--violet); }
+  .o { fill: var(--orange); } .r { fill: var(--red); } .gr { fill: var(--green); }
+  .g { fill: var(--grey); } .w { fill: var(--ink); }
+  .chip { fill: #1b1b1f; stroke-width: 1; }
+  .chip:not([stroke]) { stroke: var(--border); }   /* coloured chips set their own stroke */
+  .ax { stroke: #4a4a52; stroke-width: 1; }
+  .faint { stroke: #232328; stroke-width: 1; }
+  .dash { fill: none; stroke-dasharray: 3 2.5; stroke-width: 1.2; }
+  .br { fill: none; stroke-width: 1.2; }
+</style>
+</head>
+<body>
+
+<!-- Check and cross marks, reused by every card that needs them. -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="chk" viewBox="0 0 12 12"><path d="M1.5 6.5 L4.8 9.6 L10.5 2.6" fill="none" stroke="#4ade80" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="crs" viewBox="0 0 12 12"><path d="M2.5 2.5 L9.5 9.5 M9.5 2.5 L2.5 9.5" fill="none" stroke="#ff5c5c" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <marker id="arA" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="#f5b301"/></marker>
+    <marker id="arG" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="#8a8a92"/></marker>
+    <marker id="arW" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="#e6e6e9"/></marker>
+    <marker id="arT" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="#3ad6c5"/></marker>
+  </defs>
+</svg>
+
+<div class="kicker">LINEAR ALGEBRA × PROBABILITY</div>
+<div class="title">MULTIVARIATE<br>NORMAL</div>
+<div class="byline">simulating <b>N(μ, Σ)</b> with Cholesky · 24 concepts · 7 stages</div>
+
+<!-- ================= roadmap strip ================= -->
+<div class="strip">
+  <span class="start"></span>
+  <div class="row">
+    <div class="stage" style="--n:4"><div class="q">What does randomness look like?</div><div class="nodes">
+      <div class="node"><div class="dot">1</div><div class="lbl">random samples</div></div>
+      <div class="node"><div class="dot">2</div><div class="lbl">normal distribution</div></div>
+      <div class="node"><div class="dot">3</div><div class="lbl">mean and variance</div></div>
+      <div class="node"><div class="dot">4</div><div class="lbl">scale then shift</div></div></div></div>
+    <div class="stage" style="--n:3"><div class="q">What if there are two variables?</div><div class="nodes">
+      <div class="node"><div class="dot">5</div><div class="lbl">random vectors</div></div>
+      <div class="node"><div class="dot">6</div><div class="lbl">covariance &amp; correlation</div></div>
+      <div class="node"><div class="dot">7</div><div class="lbl">covariance matrix</div></div></div></div>
+    <div class="stage" style="--n:3"><div class="q">What exactly is the target?</div><div class="nodes">
+      <div class="node"><div class="dot">8</div><div class="lbl">multivariate normal</div></div>
+      <div class="node"><div class="dot">9</div><div class="lbl">mahalanobis distance</div></div>
+      <div class="node"><div class="dot">10</div><div class="lbl">positive definite</div></div></div></div>
+    <div class="stage" style="--n:3"><div class="q">What does a matrix do to a cloud?</div><div class="nodes">
+      <div class="node"><div class="dot">11</div><div class="lbl">linear maps</div></div>
+      <div class="node"><div class="dot">12</div><div class="lbl">transformed covariance</div></div>
+      <div class="node"><div class="dot">13</div><div class="lbl">matrix square root</div></div></div></div>
+  </div>
+  <div class="turn"></div>
+  <div class="row reverse">
+    <div class="stage" style="--n:3"><div class="q">How do we find the square root?</div><div class="nodes">
+      <div class="node"><div class="dot">14</div><div class="lbl">ldlᵀ by elimination</div></div>
+      <div class="node"><div class="dot">15</div><div class="lbl">cholesky factor</div></div>
+      <div class="node"><div class="dot">16</div><div class="lbl">direct formula</div></div></div></div>
+    <div class="stage" style="--n:5"><div class="q">How do we sample and test it?</div><div class="nodes">
+      <div class="node"><div class="dot">17</div><div class="lbl">sampling recipe</div></div>
+      <div class="node"><div class="dot">18</div><div class="lbl">numpy in 3 lines</div></div>
+      <div class="node"><div class="dot">19</div><div class="lbl">checking the samples</div></div>
+      <div class="node"><div class="dot">20</div><div class="lbl">eigen view</div></div>
+      <div class="node"><div class="dot">21</div><div class="lbl">the breaking point</div></div></div></div>
+    <div class="stage" style="--n:3"><div class="q">Where is it used?</div><div class="nodes">
+      <div class="node"><div class="dot">22</div><div class="lbl">portfolio risk</div></div>
+      <div class="node"><div class="dot">23</div><div class="lbl">gaussian processes</div></div>
+      <div class="node"><div class="dot">24</div><div class="lbl">synthetic data</div></div></div></div>
+  </div>
+  <span class="flag"></span>
+</div>
+
+<!-- ================= concept grid ================= -->
+<div class="grid">
+
+<!-- 1 random samples -->
+<div><div class="head"><span class="n">1</span><span class="l">random samples</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="11" class="s g">rng = default_rng(42)</text>
+  <text x="0" y="25" class="s g">rng.standard_normal(5)</text>
+  <g id="c1chips"></g>
+  <g id="c1line"></g>
+  <text x="112.5" y="156" class="s g" text-anchor="middle">5 draws → 5 values on the line</text>
+</svg></div></div>
+
+<!-- 2 normal distribution -->
+<div><div class="head"><span class="n">2</span><span class="l">normal distribution</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <rect x="0" y="0" width="54" height="17" rx="4" class="chip"/>
+  <text x="27" y="12" text-anchor="middle" class="w">N(0, 1)</text>
+  <g id="c2"></g>
+  <text x="112.5" y="92" text-anchor="middle" class="md b w">68.3%</text>
+  <text x="112.5" y="104" text-anchor="middle" class="xs g">±1σ</text>
+  <line x1="52.5" x2="172.5" y1="146" y2="146" stroke="#3ad6c5" stroke-width="1.2"/>
+  <line x1="52.5" x2="52.5" y1="142" y2="150" stroke="#3ad6c5" stroke-width="1.2"/>
+  <line x1="172.5" x2="172.5" y1="142" y2="150" stroke="#3ad6c5" stroke-width="1.2"/>
+  <text x="112.5" y="159" text-anchor="middle" class="s t">95.4% within ±2σ</text>
+</svg></div></div>
+
+<!-- 3 mean and variance -->
+<div><div class="head"><span class="n">3</span><span class="l">mean and variance</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <rect x="0" y="0" width="54" height="17" rx="4" class="chip"/>
+  <text x="27" y="12" text-anchor="middle" class="w">N(3, 4)</text>
+  <rect x="160" y="0" width="65" height="17" rx="4" class="chip"/>
+  <text x="192.5" y="12" text-anchor="middle" class="t">σ² = 4</text>
+  <g id="c3"></g>
+</svg></div></div>
+
+<!-- 4 scale then shift -->
+<div><div class="head"><span class="n">4</span><span class="l">scale then shift</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <rect x="0" y="6" width="56" height="20" rx="4" class="chip" stroke="#8b7cf6"/>
+  <text x="28" y="20" text-anchor="middle" class="v">z = 0.5</text>
+  <text x="73" y="20" text-anchor="middle" class="a b">×2</text>
+  <rect x="88" y="6" width="34" height="20" rx="4" class="chip"/>
+  <text x="105" y="20" text-anchor="middle">1</text>
+  <text x="140" y="20" text-anchor="middle" class="a b">+3</text>
+  <rect x="158" y="6" width="62" height="20" rx="4" class="chip" stroke="#f0883e"/>
+  <text x="189" y="20" text-anchor="middle" class="o b">x = 4</text>
+
+  <text x="0" y="52" class="s g">variance target: 4</text>
+  <use href="#chk" x="0" y="64" width="12" height="12"/>
+  <text x="18" y="74">scale ×√4 = ×2</text>
+  <text x="225" y="74" text-anchor="end" class="gr">var 4</text>
+  <use href="#crs" x="0" y="88" width="12" height="12"/>
+  <text x="18" y="98">scale ×4</text>
+  <rect x="160" y="87" width="65" height="15" rx="7.5" fill="#ff5c5c" fill-opacity="0.16" stroke="#ff5c5c" stroke-width="1"/>
+  <text x="192.5" y="98" text-anchor="middle" class="s r b">var 16</text>
+
+  <rect x="0" y="118" width="225" height="1" fill="#2a2a2e"/>
+  <text x="0" y="138" class="md"><tspan class="o">x</tspan> = <tspan class="o">μ</tspan> + <tspan class="a">σ</tspan>·<tspan class="v">z</tspan></text>
+  <text x="0" y="156" class="s g">Var(a·z) = a²·Var(z)</text>
+</svg></div></div>
+
+<!-- 5 random vectors -->
+<div><div class="head"><span class="n">5</span><span class="l">random vectors</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <line x1="2" x2="120" y1="86" y2="86" class="ax"/>
+  <line x1="61" x2="61" y1="26" y2="146" class="ax"/>
+  <g id="c5cloud"></g>
+  <rect x="61" y="99" width="11" height="11" class="dash" stroke="#f5b301"/>
+  <circle cx="66.4" cy="104.7" r="3.2" fill="#f5b301"/>
+  <rect x="128" y="18" width="96" height="19" rx="4" class="chip" stroke="#f5b301"/>
+  <text x="176" y="31" text-anchor="middle" class="a">(0.30, −1.04)</text>
+  <path d="M127 28 C 98 32, 80 62, 70 99" fill="none" stroke="#f5b301" stroke-width="1" marker-end="url(#arA)"/>
+  <text x="130" y="64" class="s g">1 row → 1 point</text>
+  <text x="130" y="96" class="v">z ~ N(0, I)</text>
+  <text x="130" y="118" class="b">corr ≈ 0.00</text>
+  <text x="130" y="133" class="s g">n = 20,000</text>
+</svg></div></div>
+
+<!-- 6 covariance & correlation -->
+<div><div class="head"><span class="n">6</span><span class="l">covariance &amp; correlation</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="112.5" y="12" text-anchor="middle">ρ = <tspan class="a">Cov(x₁,x₂)</tspan> / (σ₁σ₂)</text>
+  <g id="c6"></g>
+  <text x="37" y="134" text-anchor="middle" class="o">ρ = −0.8</text>
+  <text x="112.5" y="134" text-anchor="middle" class="v">ρ = 0</text>
+  <text x="188" y="134" text-anchor="middle" class="o">ρ = 0.8</text>
+  <text x="37" y="150" text-anchor="middle" class="xs g">tilt ↘</text>
+  <text x="112.5" y="150" text-anchor="middle" class="xs g">round</text>
+  <text x="188" y="150" text-anchor="middle" class="xs g">tilt ↗</text>
+</svg></div></div>
+
+<!-- 7 covariance matrix -->
+<div><div class="head"><span class="n">7</span><span class="l">covariance matrix</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="62" class="big t">Σ =</text>
+  <path d="M44 26 H39 V92 H44" class="br" stroke="#3ad6c5"/>
+  <path d="M110 26 H115 V92 H110" class="br" stroke="#3ad6c5"/>
+  <text x="58" y="50" class="big t" text-anchor="middle">4</text>
+  <text x="96" y="50" class="big a" text-anchor="middle">2</text>
+  <text x="58" y="80" class="big a" text-anchor="middle">2</text>
+  <text x="96" y="80" class="big t" text-anchor="middle">5</text>
+  <rect x="84" y="34" width="24" height="22" class="dash" stroke="#f5b301"/>
+  <rect x="46" y="64" width="24" height="22" class="dash" stroke="#f5b301"/>
+  <text x="130" y="40" class="s t">var(x₁) = 4</text>
+  <text x="130" y="58" class="s t">var(x₂) = 5</text>
+  <text x="130" y="76" class="s a">cov = 2</text>
+  <text x="130" y="94" class="xs g">Σᵀ = Σ</text>
+  <rect x="0" y="112" width="225" height="1" fill="#2a2a2e"/>
+  <text x="0" y="134">ρ = <tspan class="a">2</tspan> / (<tspan class="t">2</tspan>·<tspan class="t">√5</tspan>)</text>
+  <text x="0" y="154" class="md b">≈ 0.45</text>
+  <text x="225" y="154" text-anchor="end" class="xs g">diag: spread · off: tilt</text>
+</svg></div></div>
+
+<!-- 8 multivariate normal -->
+<div><div class="head"><span class="n">8</span><span class="l">multivariate normal</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="12">f(x) ∝ exp(−<tspan class="a">d²</tspan>/2)</text>
+  <text x="0" y="28"><tspan class="a">d²</tspan> = <tspan class="o">(x−μ)</tspan>ᵀ <tspan class="t">Σ⁻¹</tspan> <tspan class="o">(x−μ)</tspan></text>
+  <g id="c8"></g>
+  <text x="0" y="66" class="o">N(μ, Σ)</text>
+  <text x="0" y="82" class="xs g">μ = (1, 2)</text>
+  <text x="0" y="96" class="xs t">2σ contour</text>
+  <text x="225" y="156" text-anchor="end" class="xs g">Σ = [[4,2],[2,5]]</text>
+</svg></div></div>
+
+<!-- 9 mahalanobis distance -->
+<div><div class="head"><span class="n">9</span><span class="l">mahalanobis distance</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <g transform="translate(66 86) rotate(-52)">
+    <ellipse rx="28" ry="17.1" class="dash" stroke="#3ad6c5"/>
+    <ellipse rx="45.9" ry="28" class="dash" stroke="#3ad6c5" stroke-opacity="0.55"/>
+  </g>
+  <line x1="66" y1="86" x2="83.2" y2="63.9" stroke="#f5b301" stroke-width="1.5"/>
+  <line x1="66" y1="86" x2="43.9" y2="68.8" stroke="#f5b301" stroke-width="1.5"/>
+  <circle cx="66" cy="86" r="2.5" fill="#e6e6e9"/>
+  <circle cx="83.2" cy="63.9" r="3.6" fill="#f0883e"/>
+  <circle cx="43.9" cy="68.8" r="3.6" fill="#f0883e"/>
+  <text x="88" y="60" class="b o">A</text>
+  <text x="32" y="62" class="b o">B</text>
+  <text x="70" y="98" class="xs g">μ</text>
+  <text x="140" y="34" class="xs g">pt</text>
+  <text x="172" y="34" class="xs g" text-anchor="middle">ruler</text>
+  <text x="208" y="34" class="xs g" text-anchor="middle">d²</text>
+  <text x="140" y="56" class="o b">A</text>
+  <text x="172" y="56" text-anchor="middle">2</text>
+  <text x="208" y="56" text-anchor="middle" class="b">0.61</text>
+  <text x="140" y="76" class="o b">B</text>
+  <text x="172" y="76" text-anchor="middle">2</text>
+  <text x="208" y="76" text-anchor="middle" class="b">1.64</text>
+  <rect x="192" y="43" width="32" height="40" class="dash" stroke="#f5b301"/>
+  <text x="140" y="104" class="xs g">A: long axis</text>
+  <text x="140" y="117" class="xs g">B: short axis</text>
+  <text x="0" y="156" class="s">same ruler · <tspan class="a">different d²</tspan></text>
+</svg></div></div>
+
+<!-- 10 positive definite -->
+<div><div class="head"><span class="n">10</span><span class="l">positive definite</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="12">xᵀΣx &gt; 0  for all x ≠ 0</text>
+  <text x="0" y="28" class="xs g">Σ = [[1,ρ],[ρ,1]] · pivot 1 − ρ²</text>
+  <line x1="150" x2="150" y1="38" y2="132" stroke="#4a4a52" stroke-dasharray="2 2"/>
+  <text x="150" y="144" text-anchor="middle" class="xs g">0</text>
+  <!-- rho = 0.9 -->
+  <text x="0" y="60">ρ = 0.9</text>
+  <use href="#chk" x="58" y="51" width="11" height="11"/>
+  <rect x="150" y="52" width="17.1" height="8" rx="2" fill="#4ade80"/>
+  <text x="225" y="60" text-anchor="end" class="gr">0.19</text>
+  <!-- rho = 1 -->
+  <text x="0" y="92">ρ = 1</text>
+  <rect x="50" y="81" width="58" height="15" rx="7.5" fill="#f5b301" fill-opacity="0.16" stroke="#f5b301"/>
+  <text x="79" y="92" text-anchor="middle" class="xs a b">singular</text>
+  <rect x="148.5" y="82" width="3" height="12" fill="#f5b301"/>
+  <text x="225" y="92" text-anchor="end" class="a">0</text>
+  <!-- rho = 1.2 -->
+  <text x="0" y="124">ρ = 1.2</text>
+  <use href="#crs" x="58" y="115" width="11" height="11"/>
+  <rect x="110.4" y="116" width="39.6" height="8" rx="2" fill="#ff5c5c"/>
+  <text x="225" y="124" text-anchor="end" class="r">−0.44</text>
+  <text x="0" y="158" class="s g">all pivots &gt; 0 ⇔ Cholesky exists</text>
+</svg></div></div>
+
+<!-- 11 linear maps -->
+<div><div class="head"><span class="n">11</span><span class="l">linear maps</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <g id="c11grid"></g>
+  <polygon points="40,128 92,102 92,50 40,76" fill="#f5b301" fill-opacity="0.12" stroke="#f5b301" stroke-width="1"/>
+  <polygon points="40,128 66,128 66,102 40,102" fill="#8a8a92" fill-opacity="0.15" stroke="#8a8a92" stroke-width="1"/>
+  <line x1="40" y1="128" x2="64" y2="128" stroke="#e6e6e9" stroke-width="1.5" marker-end="url(#arW)"/>
+  <line x1="40" y1="128" x2="40" y2="104" stroke="#e6e6e9" stroke-width="1.5" marker-end="url(#arW)"/>
+  <line x1="40" y1="128" x2="90" y2="103" stroke="#f5b301" stroke-width="1.8" marker-end="url(#arA)"/>
+  <line x1="40" y1="128" x2="40" y2="78" stroke="#f5b301" stroke-width="1.8" marker-end="url(#arA)"/>
+  <text x="96" y="104" class="xs a">(2,1)</text>
+  <text x="36" y="72" text-anchor="end" class="xs a">(0,2)</text>
+  <text x="132" y="34" class="md a">G =</text>
+  <path d="M166 16 H162 V48 H166" class="br" stroke="#f5b301"/>
+  <path d="M210 16 H214 V48 H210" class="br" stroke="#f5b301"/>
+  <text x="176" y="29" class="a">2</text><text x="198" y="29" class="a">0</text>
+  <text x="176" y="43" class="a">1</text><text x="198" y="43" class="a">2</text>
+  <text x="132" y="76" class="s">e₁ → <tspan class="a">(2, 1)</tspan></text>
+  <text x="132" y="94" class="s">e₂ → <tspan class="a">(0, 2)</tspan></text>
+  <text x="132" y="122" class="s g">area × det G</text>
+  <text x="132" y="136" class="s">det G = <tspan class="a b">4</tspan></text>
+  <text x="0" y="158" class="xs g">grey: unit square · amber: after G</text>
+</svg></div></div>
+
+<!-- 12 transformed covariance -->
+<div><div class="head"><span class="n">12</span><span class="l">transformed covariance</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <rect x="40" y="2" width="145" height="22" rx="4" class="chip"/>
+  <rect x="40" y="2" width="145" height="22" rx="4" class="dash" stroke="#f5b301"/>
+  <text x="112.5" y="17" text-anchor="middle" class="md">Cov(<tspan class="a">A</tspan>z) = <tspan class="a">A Aᵀ</tspan></text>
+  <text x="0" y="48" class="s g">try A = Σ</text>
+  <text x="0" y="64">→ [[20,18],[18,29]]</text>
+  <use href="#crs" x="208" y="55" width="12" height="12"/>
+  <text x="0" y="88" class="s g">try A = √ each entry</text>
+  <text x="0" y="104">→ [[6,5.99],[5.99,7]]</text>
+  <use href="#crs" x="208" y="95" width="12" height="12"/>
+  <rect x="0" y="120" width="225" height="1" fill="#2a2a2e"/>
+  <text x="0" y="143" class="s g">want</text>
+  <text x="40" y="143" class="t b">[[4,2],[2,5]]</text>
+  <rect x="36" y="130" width="90" height="19" class="dash" stroke="#3ad6c5"/>
+  <text x="225" y="143" text-anchor="end" class="xs g">= Σ</text>
+</svg></div></div>
+
+<!-- 13 matrix square root -->
+<div><div class="head"><span class="n">13</span><span class="l">matrix square root</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="16" class="md">σ · σ = σ²</text>
+  <text x="112" y="16" text-anchor="middle" class="g">↔</text>
+  <text x="225" y="16" text-anchor="end" class="md"><tspan class="a">A Aᵀ</tspan> = <tspan class="t">Σ</tspan></text>
+  <g id="c13cloud"></g>
+  <path d="M 92 64 A 38 38 0 0 1 98 112" fill="none" stroke="#f5b301" stroke-width="1.6" marker-end="url(#arA)"/>
+  <text x="100" y="58" class="xs a">Q: rotate</text>
+  <text x="128" y="78"><tspan class="a">A</tspan></text>
+  <use href="#chk" x="146" y="69" width="11" height="11"/>
+  <text x="128" y="98"><tspan class="a">A Q</tspan></text>
+  <use href="#chk" x="158" y="89" width="11" height="11"/>
+  <text x="128" y="118" class="xs g">(AQ)(AQ)ᵀ = AAᵀ</text>
+  <rect x="0" y="138" width="225" height="20" rx="4" class="chip"/>
+  <text x="112.5" y="152" text-anchor="middle" class="s a">many roots → pick one rule</text>
+</svg></div></div>
+
+<!-- 14 ldl^T by elimination -->
+<div><div class="head"><span class="n">14</span><span class="l">ldlᵀ by elimination</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="12" class="s"><tspan class="t">Σ</tspan> = [[4,2,2],[2,5,3],[2,3,3]]</text>
+  <text x="0" y="34" class="s">R₂ − <tspan class="a b">0.5</tspan>·R₁ → [0, 4, 2]</text>
+  <text x="0" y="50" class="s">R₃ − <tspan class="a b">0.5</tspan>·R₁ → [0, 2, 2]</text>
+  <text x="0" y="66" class="s">R₃ − <tspan class="a b">0.5</tspan>·R₂ → [0, 0, 1]</text>
+  <text x="0" y="92" class="xs g">pivots</text>
+  <rect x="44" y="80" width="22" height="18" rx="4" class="chip" stroke="#4ade80"/>
+  <text x="55" y="93" text-anchor="middle" class="gr b">4</text>
+  <rect x="70" y="80" width="22" height="18" rx="4" class="chip" stroke="#4ade80"/>
+  <text x="81" y="93" text-anchor="middle" class="gr b">4</text>
+  <rect x="96" y="80" width="22" height="18" rx="4" class="chip" stroke="#4ade80"/>
+  <text x="107" y="93" text-anchor="middle" class="gr b">1</text>
+  <text x="128" y="93" class="s">→ D = diag(4,4,1)</text>
+  <text x="0" y="120" class="s">L = <tspan class="a b">multipliers</tspan> · V = Lᵀ</text>
+  <rect x="0" y="134" width="96" height="22" rx="4" class="chip"/>
+  <rect x="0" y="134" width="96" height="22" rx="4" class="dash" stroke="#f5b301"/>
+  <text x="48" y="149" text-anchor="middle" class="b">Σ = L D Lᵀ</text>
+  <text x="225" y="149" text-anchor="end" class="xs g">symmetry</text>
+</svg></div></div>
+
+<!-- 15 cholesky factor -->
+<div><div class="head"><span class="n">15</span><span class="l">cholesky factor</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="62" class="big a">G =</text>
+  <path d="M42 18 H37 V100 H42" class="br" stroke="#f5b301"/>
+  <path d="M112 18 H117 V100 H112" class="br" stroke="#f5b301"/>
+  <text x="54" y="40" class="md a b" text-anchor="middle">2</text><text x="77" y="40" class="md g" text-anchor="middle">0</text><text x="100" y="40" class="md g" text-anchor="middle">0</text>
+  <text x="54" y="65" class="md a b" text-anchor="middle">1</text><text x="77" y="65" class="md a b" text-anchor="middle">2</text><text x="100" y="65" class="md g" text-anchor="middle">0</text>
+  <text x="54" y="90" class="md a b" text-anchor="middle">1</text><text x="77" y="90" class="md a b" text-anchor="middle">1</text><text x="100" y="90" class="md a b" text-anchor="middle">1</text>
+  <text x="130" y="30">G = L·√D</text>
+  <text x="130" y="48" class="xs g">√D = diag(2,2,1)</text>
+  <text x="130" y="68" class="s">lower ◣</text>
+  <text x="130" y="94" class="s">G Gᵀ = <tspan class="t">Σ</tspan></text>
+  <use href="#chk" x="208" y="85" width="12" height="12"/>
+  <rect x="0" y="116" width="225" height="1" fill="#2a2a2e"/>
+  <text x="0" y="138" class="s g">cost ≈ n³/3 flops</text>
+  <text x="0" y="155" class="s">n = 1000 → <tspan class="a">3.3×10⁸</tspan></text>
+</svg></div></div>
+
+<!-- 16 direct formula -->
+<div><div class="head"><span class="n">16</span><span class="l">direct formula</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <g id="c16grid"></g>
+  <text x="30" y="88" class="xs g" text-anchor="middle">solve order</text>
+  <text x="70" y="20" class="s"><tspan class="t">g₁₁ = √4 = 2</tspan></text>
+  <text x="70" y="38" class="s"><tspan class="a">g₂₁ = 2/2 = 1</tspan></text>
+  <text x="70" y="56" class="s"><tspan class="a">g₃₁ = 2/2 = 1</tspan></text>
+  <text x="70" y="74" class="s"><tspan class="t">g₂₂ = √(5−1²) = 2</tspan></text>
+  <text x="70" y="92" class="s"><tspan class="a">g₃₂ = (3−1·1)/2 = 1</tspan></text>
+  <text x="70" y="110" class="s"><tspan class="t">g₃₃ = √(3−1²−1²) = 1</tspan></text>
+  <rect x="0" y="126" width="225" height="1" fill="#2a2a2e"/>
+  <text x="0" y="146" class="s t">√ diagonal: leftover var</text>
+  <text x="0" y="160" class="s a">÷ below: leftover cov / g_jj</text>
+</svg></div></div>
+
+<!-- 17 sampling recipe -->
+<div><div class="head"><span class="n">17</span><span class="l">sampling recipe</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <g id="c17grid"></g>
+  <line x1="4" x2="118" y1="82" y2="82" class="ax"/>
+  <line x1="32" x2="32" y1="26" y2="150" class="ax"/>
+  <line x1="46" y1="110" x2="58" y2="122" stroke="#f5b301" stroke-width="1.4" marker-end="url(#arA)"/>
+  <line x1="60" y1="124" x2="86" y2="71" stroke="#8a8a92" stroke-width="1.4" stroke-dasharray="3 2" marker-end="url(#arG)"/>
+  <circle cx="46" cy="110" r="4" fill="#8b7cf6"/>
+  <circle cx="60" cy="124" r="4" fill="#f5b301"/>
+  <circle cx="88" cy="68" r="4.5" fill="#f0883e"/>
+  <text x="38" y="104" class="xs v" text-anchor="end">z</text>
+  <text x="66" y="138" class="xs a">Gz</text>
+  <text x="95" y="64" class="xs o">x</text>
+  <rect x="126" y="12" width="98" height="20" rx="4" class="chip" stroke="#8b7cf6"/>
+  <text x="175" y="26" text-anchor="middle" class="v">z (0.5, −1)</text>
+  <rect x="126" y="40" width="98" height="20" rx="4" class="chip" stroke="#f5b301"/>
+  <text x="175" y="54" text-anchor="middle" class="a">Gz (1, −1.5)</text>
+  <rect x="126" y="68" width="98" height="20" rx="4" class="chip"/>
+  <text x="175" y="82" text-anchor="middle" class="g">+μ (1, 2)</text>
+  <rect x="126" y="96" width="98" height="20" rx="4" class="chip" stroke="#f0883e"/>
+  <rect x="123" y="93" width="104" height="26" rx="5" class="dash" stroke="#f0883e"/>
+  <text x="175" y="110" text-anchor="middle" class="o b">x (2, 0.5)</text>
+  <text x="225" y="152" text-anchor="end" class="md"><tspan class="o">x</tspan> = <tspan class="o">μ</tspan> + <tspan class="a">G</tspan><tspan class="v">z</tspan></text>
+</svg></div></div>
+
+<!-- 18 numpy in 3 lines -->
+<div><div class="head"><span class="n">18</span><span class="l">numpy in 3 lines</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <rect x="0" y="0" width="225" height="86" rx="5" fill="#0d0d0f" stroke="#2a2a2e"/>
+  <text x="8" y="24">G = np.linalg.<tspan class="a">cholesky</tspan>(S)</text>
+  <text x="8" y="46">Z = rng.<tspan class="a">standard_normal</tspan>((n, <tspan class="v">2</tspan>))</text>
+  <text x="8" y="68">X = mu + Z @ <tspan class="a b">G.T</tspan></text>
+  <rect x="83" y="56" width="24" height="17" class="dash" stroke="#f5b301"/>
+  <path d="M95 74 V 98" stroke="#f5b301" stroke-width="1" marker-end="url(#arA)"/>
+  <text x="102" y="102" class="s a">rows, so G.T</text>
+  <rect x="0" y="118" width="80" height="20" rx="4" class="chip" stroke="#8b7cf6"/>
+  <text x="40" y="132" text-anchor="middle" class="s v">Z: (n, 2)</text>
+  <text x="96" y="132" class="g">→</text>
+  <rect x="112" y="118" width="80" height="20" rx="4" class="chip" stroke="#f0883e"/>
+  <text x="152" y="132" text-anchor="middle" class="s o">X: (n, 2)</text>
+  <text x="0" y="158" class="xs g">no loops · one matmul</text>
+</svg></div></div>
+
+<!-- 19 checking the samples -->
+<div><div class="head"><span class="n">19</span><span class="l">checking the samples</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="11" class="xs g">target</text>
+  <text x="112" y="11" class="xs g">n = 20,000 samples</text>
+  <text x="0" y="40" class="md t">Σ</text>
+  <path d="M22 22 H18 V52 H22" class="br" stroke="#3ad6c5"/>
+  <path d="M68 22 H72 V52 H68" class="br" stroke="#3ad6c5"/>
+  <text x="32" y="34" class="t">4</text><text x="56" y="34" class="t">2</text>
+  <text x="32" y="48" class="t">2</text><text x="56" y="48" class="t">5</text>
+  <text x="112" y="40" class="md o">Σ̂</text>
+  <path d="M134 22 H130 V52 H134" class="br" stroke="#f0883e"/>
+  <path d="M220 22 H224 V52 H220" class="br" stroke="#f0883e"/>
+  <text x="140" y="34" class="o">3.96</text><text x="184" y="34" class="o">1.99</text>
+  <text x="140" y="48" class="o">1.99</text><text x="184" y="48" class="o">5.11</text>
+  <text x="0" y="80" class="s"><tspan class="t">μ</tspan>  (1, 2)</text>
+  <text x="112" y="80" class="s"><tspan class="o">μ̂</tspan>  (0.99, 2.02)</text>
+  <rect x="0" y="96" width="225" height="1" fill="#2a2a2e"/>
+  <text x="0" y="116" class="xs g">|error| per entry</text>
+  <g id="c19bars"></g>
+  <text x="0" y="158" class="s">max |err| = <tspan class="gr b">0.11</tspan></text>
+  <use href="#chk" x="210" y="148" width="12" height="12"/>
+</svg></div></div>
+
+<!-- 20 eigen view -->
+<div><div class="head"><span class="n">20</span><span class="l">eigen view</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <defs><clipPath id="clip20"><rect x="0" y="18" width="140" height="146"/></clipPath></defs>
+  <text x="0" y="11" class="s t">Σ = [[5,4],[4,5]]</text>
+  <g id="c20cloud" clip-path="url(#clip20)"></g>
+  <g transform="translate(70 92) rotate(-45)">
+    <ellipse rx="36" ry="12" fill="none" stroke="#3ad6c5" stroke-width="1.4"/>
+  </g>
+  <line x1="70" y1="92" x2="94.7" y2="67.3" stroke="#f5b301" stroke-width="2" marker-end="url(#arA)"/>
+  <line x1="70" y1="92" x2="77.5" y2="99.5" stroke="#e6e6e9" stroke-width="2" marker-end="url(#arW)"/>
+  <text x="98" y="64" class="xs a b">v₁</text>
+  <text x="80" y="110" class="xs b">v₂</text>
+  <text x="150" y="40" class="a">λ₁ = 9</text>
+  <text x="150" y="56" class="s g">√ = <tspan class="a b">3</tspan></text>
+  <text x="150" y="84">λ₂ = 1</text>
+  <text x="150" y="100" class="s g">√ = <tspan class="w b">1</tspan></text>
+  <rect x="146" y="124" width="74" height="22" rx="4" class="chip"/>
+  <rect x="146" y="124" width="74" height="22" rx="4" class="dash" stroke="#3ad6c5"/>
+  <text x="183" y="139" text-anchor="middle" class="t">Σv = λv</text>
+</svg></div></div>
+
+<!-- 21 the breaking point -->
+<div><div class="head"><span class="n">21</span><span class="l">the breaking point</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="12" class="a">G₂₂ = √(1 − ρ²)</text>
+  <text x="225" y="12" text-anchor="end" class="xs g">thickness</text>
+  <g id="c21"></g>
+  <text x="0" y="160" class="xs g">cloud → line → impossible</text>
+</svg></div></div>
+
+<!-- 22 portfolio risk -->
+<div><div class="head"><span class="n">22</span><span class="l">portfolio risk</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <rect x="0" y="4" width="9" height="9" rx="2" fill="#8b7cf6"/>
+  <text x="14" y="12" class="xs">ρ = 0</text><text x="66" y="12" class="xs">sd 0.71</text><text x="124" y="12" class="xs">VaR −1.16</text>
+  <rect x="0" y="19" width="9" height="9" rx="2" fill="#f0883e"/>
+  <text x="14" y="27" class="xs">ρ = 0.8</text><text x="66" y="27" class="xs">sd 0.95</text><text x="124" y="27" class="xs">VaR −1.56</text>
+  <g id="c22"></g>
+  <rect x="160" y="44" width="62" height="15" rx="7.5" fill="#ff5c5c" fill-opacity="0.16" stroke="#ff5c5c"/>
+  <text x="191" y="55" text-anchor="middle" class="xs r b">sd +34%</text>
+  <text x="225" y="160" text-anchor="end" class="xs g">50/50 · red: 5% worst</text>
+</svg></div></div>
+
+<!-- 23 gaussian processes -->
+<div><div class="head"><span class="n">23</span><span class="l">gaussian processes</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="0" y="11">60 points · <tspan class="o">x</tspan> = <tspan class="a">G</tspan><tspan class="v">z</tspan></text>
+  <text x="0" y="25" class="xs g">K = RBF(ℓ = 1) + 10⁻⁶·I</text>
+  <g id="c23"></g>
+  <circle cx="4" cy="140" r="2.5" fill="#8b7cf6"/>
+  <text x="11" y="143" class="xs">z jagged</text>
+  <line x1="70" x2="84" y1="140" y2="140" stroke="#f0883e" stroke-width="2"/>
+  <text x="88" y="143" class="xs">x smooth</text>
+  <rect x="0" y="149" width="132" height="15" rx="7.5" fill="#ff5c5c" fill-opacity="0.16" stroke="#ff5c5c"/>
+  <text x="66" y="160" text-anchor="middle" class="xs r b">no jitter → chol fails</text>
+</svg></div></div>
+
+<!-- 24 synthetic data -->
+<div><div class="head"><span class="n">24</span><span class="l">synthetic data</span></div><div class="card">
+<svg viewBox="0 0 225 164">
+  <text x="58" y="11" text-anchor="middle" class="xs g">original</text>
+  <text x="182" y="11" text-anchor="middle" class="xs g">synthetic copy</text>
+  <g id="c24"></g>
+  <line x1="98" x2="140" y1="44" y2="44" stroke="#8a8a92" stroke-width="1.2" marker-end="url(#arG)"/>
+  <text x="119" y="60" text-anchor="middle" class="xs g">20,000</text>
+  <text x="119" y="71" text-anchor="middle" class="xs g">rows</text>
+  <rect x="0" y="104" width="225" height="1" fill="#2a2a2e"/>
+  <g id="c24rows"></g>
+  <text x="225" y="128" text-anchor="end" class="s gr">corr match</text>
+  <use href="#chk" x="146" y="119" width="11" height="11"/>
+  <text x="225" y="146" text-anchor="end" class="xs g">max Δ = .01</text>
+</svg></div></div>
+
+</div>
+
+<script>
+// Seeded randomness so the clouds and curves are identical on every load
+// (and in every PNG export).
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(r) {
+  let u = 0;
+  while (u === 0) u = r();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r());
+}
+function chol(m) {  // Cholesky factor of a symmetric positive definite matrix
+  const n = m.length, g = m.map(() => new Array(n).fill(0));
+  for (let j = 0; j < n; j++) {
+    let s = m[j][j];
+    for (let k = 0; k < j; k++) s -= g[j][k] * g[j][k];
+    g[j][j] = Math.sqrt(s);
+    for (let i = j + 1; i < n; i++) {
+      let t = m[i][j];
+      for (let k = 0; k < j; k++) t -= g[i][k] * g[j][k];
+      g[i][j] = t / g[j][j];
+    }
+  }
+  return g;
+}
+
+const NS = "http://www.w3.org/2000/svg";
+function el(parent, tag, attrs, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  document.getElementById(parent).appendChild(e);
+  return e;
+}
+// Dots of x = G z for z ~ N(0, I), drawn with y pointing up.
+function cloud(id, { cx, cy, scale, sigma, n, color, r = 1.3, seed, opacity = 0.75 }) {
+  const g = chol(sigma), rand = rng(seed);
+  for (let i = 0; i < n; i++) {
+    const z1 = gauss(rand), z2 = gauss(rand);
+    const x = g[0][0] * z1, y = g[1][0] * z1 + g[1][1] * z2;
+    el(id, "circle", { cx: cx + x * scale, cy: cy - y * scale, r, fill: color, "fill-opacity": opacity });
+  }
+}
+function path(id, fn, x0, x1, X, Y, attrs, steps = 120) {
+  let d = "";
+  for (let i = 0; i <= steps; i++) {
+    const v = x0 + (x1 - x0) * i / steps;
+    d += (i ? "L" : "M") + X(v).toFixed(2) + " " + Y(fn(v)).toFixed(2);
+  }
+  return el(id, "path", { d, ...attrs });
+}
+const pdf = (x, mu, sd) => Math.exp(-0.5 * ((x - mu) / sd) ** 2) / (sd * Math.sqrt(2 * Math.PI));
+
+// 1: five real draws from numpy's default_rng(42), placed on a number line
+(() => {
+  const vals = [0.3047, -1.0400, 0.7505, 0.9406, -1.9510];
+  const labels = ["0.30", "−1.04", "0.75", "0.94", "−1.95"];
+  const X = v => 112.5 + v * 32, lineY = 112;
+  el("c1line", "line", { x1: X(-3.2), x2: X(3.2), y1: lineY, y2: lineY, class: "ax" });
+  for (let t = -3; t <= 3; t++) {
+    el("c1line", "line", { x1: X(t), x2: X(t), y1: lineY - 3, y2: lineY + 3, class: "ax" });
+    el("c1line", "text", { x: X(t), y: lineY + 15, class: "xs g", "text-anchor": "middle" }, t < 0 ? "−" + -t : String(t));
+  }
+  vals.forEach((v, i) => {
+    const x = 21 + i * 45.75;
+    el("c1chips", "rect", { x: x - 20, y: 34, width: 40, height: 18, rx: 4, class: "chip", stroke: "#f5b301" });
+    el("c1chips", "text", { x, y: 47, class: "s a", "text-anchor": "middle" }, labels[i]);
+    el("c1line", "line", { x1: x, y1: 53, x2: X(v), y2: lineY - 5, stroke: "#8a8a92", "stroke-opacity": 0.45, "stroke-width": 1 });
+    el("c1line", "circle", { cx: X(v), cy: lineY, r: 3.6, fill: "#f5b301" });
+  });
+})();
+
+// 2: N(0, 1) with the 68.3% and 95.4% bands shaded
+(() => {
+  const X = v => 112.5 + v * 30, Y = p => 128 - p * 205;
+  const band = (a, b, op) => {
+    let d = `M${X(a)} ${Y(0)}`;
+    for (let i = 0; i <= 60; i++) { const v = a + (b - a) * i / 60; d += `L${X(v).toFixed(2)} ${Y(pdf(v, 0, 1)).toFixed(2)}`; }
+    el("c2", "path", { d: d + `L${X(b)} ${Y(0)}Z`, fill: "#3ad6c5", "fill-opacity": op });
+  };
+  band(-2, 2, 0.12);
+  band(-1, 1, 0.3);
+  el("c2", "line", { x1: 8, x2: 217, y1: 128, y2: 128, class: "ax" });
+  path("c2", v => pdf(v, 0, 1), -3.5, 3.5, X, Y, { fill: "none", stroke: "#3ad6c5", "stroke-width": 2 });
+  for (const t of [-2, -1, 0, 1, 2]) el("c2", "text", { x: X(t), y: 139, class: "xs g", "text-anchor": "middle" }, t < 0 ? "−" + -t : String(t));
+})();
+
+// 3: N(3, 4): mean line and one standard deviation
+(() => {
+  const X = v => 12 + (v + 3) * 16.75, Y = p => 128 - p * 440;
+  el("c3", "line", { x1: 8, x2: 217, y1: 128, y2: 128, class: "ax" });
+  path("c3", v => pdf(v, 3, 2), -3, 9, X, Y, { fill: "none", stroke: "#f0883e", "stroke-width": 2 });
+  el("c3", "line", { x1: X(3), x2: X(3), y1: 128, y2: Y(pdf(3, 3, 2)) - 4, stroke: "#e6e6e9", "stroke-dasharray": "3 2.5" });
+  el("c3", "text", { x: X(3) + 5, y: 34, class: "s" }, "μ = 3");
+  const h = Y(pdf(5, 3, 2));
+  el("c3", "line", { x1: X(3) + 2, x2: X(5) - 2, y1: h, y2: h, stroke: "#f5b301", "stroke-width": 1.6, "marker-start": "url(#arA)", "marker-end": "url(#arA)" });
+  el("c3", "text", { x: (X(3) + X(5)) / 2, y: h + 13, class: "s a", "text-anchor": "middle" }, "σ = 2");
+  for (const t of [-1, 1, 3, 5, 7]) {
+    el("c3", "text", { x: X(t), y: 141, class: "xs g", "text-anchor": "middle" }, t < 0 ? "−" + -t : String(t));
+  }
+  el("c3", "text", { x: 112.5, y: 158, class: "xs g", "text-anchor": "middle" }, "μ ± σ = 1 … 5");
+})();
+
+// 5: N(0, I) cloud, with the first row (0.30, -1.04) highlighted in the markup
+cloud("c5cloud", { cx: 61, cy: 86, scale: 18, sigma: [[1, 0], [0, 1]], n: 170, color: "#8b7cf6", seed: 5 });
+
+// 6: three correlations from the same seed
+[[37, -0.8, "#f0883e"], [112.5, 0, "#8b7cf6"], [188, 0.8, "#f0883e"]].forEach(([cx, rho, color]) => {
+  el("c6", "line", { x1: cx - 34, x2: cx + 34, y1: 72, y2: 72, class: "faint" });
+  el("c6", "line", { x1: cx, x2: cx, y1: 30, y2: 114, class: "faint" });
+  cloud("c6", { cx, cy: 72, scale: 12, sigma: [[1, rho], [rho, 1]], n: 120, color, r: 1.15, seed: 6 });
+});
+
+// 8: the target cloud N(mu, Sigma) with its 2-sigma ellipse
+(() => {
+  const cx = 140, cy = 98, s = 7.6;
+  cloud("c8", { cx, cy, scale: s, sigma: [[4, 2], [2, 5]], n: 220, color: "#f0883e", seed: 8, r: 1.2 });
+  // eigenvalues 6.56 and 2.44; long axis at 52 degrees
+  el("c8", "ellipse", { cx, cy, rx: 2 * Math.sqrt(6.5616) * s, ry: 2 * Math.sqrt(2.4384) * s, fill: "none", stroke: "#3ad6c5", "stroke-width": 1.5, transform: `rotate(-52 ${cx} ${cy})` });
+  el("c8", "circle", { cx, cy, r: 2.6, fill: "#e6e6e9" });
+})();
+
+// 11: faint unit grid behind the unit square and its image
+for (let i = 0; i <= 3; i++) {
+  el("c11grid", "line", { x1: 40 + i * 26, x2: 40 + i * 26, y1: 24, y2: 128, class: "faint" });
+}
+for (let j = 0; j <= 4; j++) {
+  el("c11grid", "line", { x1: 40, x2: 118, y1: 128 - j * 26, y2: 128 - j * 26, class: "faint" });
+}
+
+// 13: round cloud (rotating it changes nothing)
+cloud("c13cloud", { cx: 60, cy: 90, scale: 11, sigma: [[1, 0], [0, 1]], n: 140, color: "#8b7cf6", seed: 13 });
+
+// 16: solve order inside the lower triangle
+(() => {
+  const order = { "0,0": 1, "1,0": 2, "2,0": 3, "1,1": 4, "2,1": 5, "2,2": 6 };
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    const x = 4 + j * 18, y = 14 + i * 18, k = order[`${i},${j}`];
+    el("c16grid", "rect", { x, y, width: 16, height: 16, rx: 3, fill: k ? "#1b1b1f" : "none", stroke: k ? (i === j ? "#3ad6c5" : "#f5b301") : "#2a2a2e" });
+    el("c16grid", "text", { x: x + 8, y: y + 11.5, class: "xs " + (k ? (i === j ? "t" : "a") : "g"), "text-anchor": "middle" }, k ? String(k) : "0");
+  }
+})();
+
+// 17: faint grid for the worked point
+for (let v = -1; v <= 3; v++) el("c17grid", "line", { x1: 32 + v * 28, x2: 32 + v * 28, y1: 26, y2: 150, class: "faint" });
+for (let v = -2; v <= 1; v++) el("c17grid", "line", { x1: 4, x2: 118, y1: 82 - v * 28, y2: 82 - v * 28, class: "faint" });
+
+// 19: absolute error of each entry of Sigma-hat
+[["σ₁₁", 0.04], ["σ₁₂", 0.01], ["σ₂₂", 0.11]].forEach(([name, err], i) => {
+  const y = 124 + i * 10;
+  el("c19bars", "text", { x: 0, y: y + 3, class: "xs g" }, name);
+  el("c19bars", "rect", { x: 36, y: y - 3, width: 150, height: 5, rx: 2.5, fill: "#232328" });
+  el("c19bars", "rect", { x: 36, y: y - 3, width: Math.max(2, err / 0.25 * 150), height: 5, rx: 2.5, fill: "#4ade80" });
+  el("c19bars", "text", { x: 225, y: y + 3, class: "xs", "text-anchor": "end" }, err.toFixed(2));
+});
+
+// 20: the [[5, 4], [4, 5]] cloud
+cloud("c20cloud", { cx: 70, cy: 92, scale: 12, sigma: [[5, 4], [4, 5]], n: 170, color: "#f0883e", seed: 20, r: 1.2, opacity: 0.6 });
+
+// 21: G22 = sqrt(1 - rho^2) as rho approaches and passes 1
+(() => {
+  const rows = [[0, "1.000"], [0.9, "0.436"], [0.99, "0.141"], [0.999, "0.045"], [1, "0"], [1.2, null]];
+  rows.forEach(([rho, label], i) => {
+    const y = 34 + i * 19;
+    el("c21", "text", { x: 0, y: y + 4, class: "s" }, "ρ = " + rho);
+    el("c21", "rect", { x: 72, y: y - 3, width: 100, height: 6, rx: 3, fill: "#232328" });
+    if (label === null) {
+      el("c21", "text", { x: 225, y: y + 4, class: "s r b", "text-anchor": "end" }, "√(−0.44)");
+      el("c21", "use", { href: "#crs", x: 74, y: y - 5, width: 10, height: 10 });
+    } else if (rho === 1) {
+      el("c21", "rect", { x: 72, y: y - 4, width: 3, height: 8, fill: "#f5b301" });
+      el("c21", "text", { x: 225, y: y + 4, class: "s a b", "text-anchor": "end" }, "0 · flat");
+    } else {
+      el("c21", "rect", { x: 72, y: y - 3, width: Math.max(2, Math.sqrt(1 - rho * rho) * 100), height: 6, rx: 3, fill: "#4ade80" });
+      el("c21", "text", { x: 225, y: y + 4, class: "s", "text-anchor": "end" }, label);
+    }
+  });
+})();
+
+// 22: portfolio return distributions (unit-variance stocks, 50/50 weights)
+(() => {
+  const X = v => 12 + (v + 3.2) * 31.4, Y = p => 134 - p * 130, base = 134;
+  const bins = 26, lo = -3.2, hi = 3.2, w = (hi - lo) / bins;
+  for (const [sd, color] of [[Math.sqrt(0.5), "#8b7cf6"], [Math.sqrt(0.9), "#f0883e"]]) {
+    for (let b = 0; b < bins; b++) {
+      const mid = lo + (b + 0.5) * w, h = pdf(mid, 0, sd);
+      el("c22", "rect", { x: X(lo + b * w) + 0.5, y: Y(h), width: w * 31.4 - 1, height: base - Y(h), fill: color, "fill-opacity": 0.4 });
+    }
+  }
+  el("c22", "line", { x1: 8, x2: 217, y1: base, y2: base, class: "ax" });
+  for (const [v, txt] of [[-1.163, "−1.16"], [-1.561, "−1.56"]]) {
+    el("c22", "line", { x1: X(v), x2: X(v), y1: base, y2: 62, stroke: "#ff5c5c", "stroke-width": 1.3, "stroke-dasharray": "3 2" });
+  }
+  el("c22", "text", { x: X(-1.36), y: 56, class: "xs r", "text-anchor": "middle" }, "VaR");
+  for (const t of [-2, 0, 2]) el("c22", "text", { x: X(t), y: 145, class: "xs g", "text-anchor": "middle" }, t < 0 ? "−" + -t : String(t));
+})();
+
+// 23: one Gaussian process draw: jagged z and the smooth x = G z from the same z
+(() => {
+  const n = 60, xs = Array.from({ length: n }, (_, i) => 10 * i / (n - 1));
+  const K = xs.map(a => xs.map(b => Math.exp(-0.5 * (a - b) ** 2)));
+  K.forEach((row, i) => { row[i] += 1e-6; });
+  const G = chol(K), r = rng(23);
+  const z = xs.map(() => gauss(r));
+  const x = G.map(row => row.reduce((s, g, k) => s + g * z[k], 0));
+  const X = v => 6 + v * 21.3, Y = v => 80 - v * 14;
+  el("c23", "line", { x1: 4, x2: 220, y1: 80, y2: 80, class: "ax" });
+  let d = "";
+  xs.forEach((v, i) => { d += (i ? "L" : "M") + X(v).toFixed(1) + " " + Y(z[i]).toFixed(1); });
+  el("c23", "path", { d, fill: "none", stroke: "#8b7cf6", "stroke-width": 0.8, "stroke-opacity": 0.5 });
+  xs.forEach((v, i) => el("c23", "circle", { cx: X(v), cy: Y(z[i]), r: 1.6, fill: "#8b7cf6" }));
+  let c = "";
+  xs.forEach((v, i) => { c += (i ? "L" : "M") + X(v).toFixed(1) + " " + Y(x[i]).toFixed(1); });
+  el("c23", "path", { d: c, fill: "none", stroke: "#f0883e", "stroke-width": 2.2, "stroke-linejoin": "round" });
+})();
+
+// 24: original correlations and the ones measured on 20,000 synthetic rows
+(() => {
+  const names = ["Ma", "Ph", "En"];
+  const orig = [[1, .7, .3], [.7, 1, .35], [.3, .35, 1]];
+  const synth = [[1, .71, .31], [.71, 1, .36], [.31, .36, 1]];
+  const fmtc = v => (v === 1 ? "1" : String(v).replace(/^0/, ""));
+  const heat = (x0, m, labels) => m.forEach((row, i) => row.forEach((v, j) => {
+    const x = x0 + j * 25, y = 18 + i * 25;
+    el("c24", "rect", { x, y, width: 23, height: 23, rx: 3, fill: "#3ad6c5", "fill-opacity": 0.12 + 0.6 * v });
+    el("c24", "text", { x: x + 11.5, y: y + 15, class: "xs b", "text-anchor": "middle", style: `fill:${v > 0.6 ? "#0a0a0b" : "#e6e6e9"}` }, fmtc(v));
+    if (labels && j === 0) el("c24", "text", { x: x0 - 4, y: y + 15, class: "xs g", "text-anchor": "end" }, names[i]);
+  }));
+  heat(22, orig, true);
+  [["Ma", "Ph", "En"], ["69", "59", "72"], ["76", "56", "49"]].forEach((row, i) => row.forEach((v, j) =>
+    el("c24rows", "text", { x: 10 + j * 30, y: 120 + i * 16, class: i ? "s" : "xs g", "text-anchor": "middle" }, v)));
+  heat(146, synth, false);
+})();
+</script>
+</body>
+</html>
